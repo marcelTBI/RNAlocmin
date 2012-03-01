@@ -1,0 +1,27 @@
+# Name of your program
+package "RNAlocmin" # don't use package if you're using automake
+purpose "Calculate local minima from RNAsubopt -p output file"
+
+# Version of your program
+version "0.1"   # don't use version if you're using automake
+
+# command line options passed to gengetopt
+args "--file-name=RNAlocmin_cmdline --include-getopt --default-optional --unamed-opts"
+
+# Options
+option "move"               m "Move set:\nI ==> insertion & deletion of base pair\nS ==> I&D& switch base pair" values="I","S" default="I" no
+option "min-num"            n "Maximal number of local minima returned" int default="100" no
+option "find-num"           - "Maximal number of local minima found \n  (default = unlimited - crawl through whole file)" int no
+option "seq"                s "Sequence file in FASTA format" string default="seq.txt"
+option "verbose-lvl"        v "Level of verbosity (0 = nothing, 4 = full)\n WARNING: higher verbose levels increase computation time" int default="0" no
+option "rates"              r "Create rates for treekin" flag off
+option "rates-file"         f "File where to write rates" string default="rates.out" no
+option "temp"               T "Temperature in Celsius (only for rates)" double default="37.0" no
+option "depth"              d "Depth of findpath search (higher values increase running time)" int default="10" no
+option "minh"               - "Print only minima with energy barrier greater than this" double default="0.0" no
+option "noLP"               - "Work with canonical RNA structures (w/o isolated base pairs)" flag off
+option "bartree"            b "Generate possible barrier tree" flag off
+option "useEOS"             e "Use energy_of_structure_pt calculation instead of energy_of_move (slower, it should not affect results)" flag off
+option "useFirst"           - "Use first found lower energy structure instead of deepest" flag off
+option "floodPortion"       - "Fraction of minima to flood\n(0.0 -> no flood; 1.0 -> try to flood all of them)" double default="0.95" no
+option "floodMax"           - "Flood cap - how many structures to flood in one basin" int default="1000" no
