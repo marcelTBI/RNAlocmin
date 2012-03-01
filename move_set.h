@@ -28,7 +28,7 @@ struct setcomp {
   bool operator() (const short *lhs, const short *rhs) const {
     // here we have structures as numbers, but we want to compare them as chars in bractet dot notation: "()."
     int i=1;
-    char l,r;
+    char l=0,r=0;
     while (i<=lhs[0]) {
       l = (lhs[i]==0?'.':(lhs[i]<lhs[lhs[i]]?'(':')'));
       r = (rhs[i]==0?'.':(rhs[i]<rhs[rhs[i]]?'(':')'));
@@ -55,6 +55,7 @@ typedef struct _options {
   bool first;   // use first descent, not deepest
   bool shift;   // use shifts?
   int verbose_lvl; // level of verbosity
+  int floodMax; // cap for flooding
 
   // pointer to function used on every neighbour (in update deepest)
   bool (*f_point) (short *, int);  // (I dont like it either, but it was easiest way to program it...:/ )
@@ -99,6 +100,10 @@ int find_lone_pair(string &str);
 
 // if the structure has lone pairs
 int find_lone_pair(short* str);
+
+// copying of arrays
+short* allocopy(short *src);
+void copy_arr(short *desc, short *src);
 
 
 // ################################################### BIG (IMPORTANT) FUNCTIONS

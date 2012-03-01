@@ -36,12 +36,6 @@ inline bool lone_base(short *pt, int i);
 // try insert base pair (i,j)
 inline bool try_insert(short *pt, const char *seq, int i, int j);
 
-inline void copy_arr(short *dest, short *src);
-
-inline short *allocopy(short *src);
-
-inline void erase_set(set<short*, setcomp> &_set);
-
 // ############################## IMPLEMENTATION #####################################
 
 // reads a line no matter how long
@@ -446,7 +440,7 @@ int shifts(encoded &enc, int &deepest, short *min_pt, degen &deg, bool verbose)
   return cnt;
 }
 
-inline void copy_arr(short *dest, short *src)
+void copy_arr(short *dest, short *src)
 {
   if (!src || !dest) {
     fprintf(stderr, "Empty pointer in copying\n");
@@ -455,7 +449,7 @@ inline void copy_arr(short *dest, short *src)
   memcpy(dest, src, sizeof(short)*(src[0]+1));
 }
 
-inline short *allocopy(short *src)
+short *allocopy(short *src)
 {
   short *res = (short*) space(sizeof(short)*(src[0]+1));
   copy_arr(res, src);

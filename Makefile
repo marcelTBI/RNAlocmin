@@ -15,8 +15,7 @@ OBJ = RNAlocmin_cmdline.o\
 			move_set.o\
 			treeplot.o\
 
-DIRS =  -I $(ViennaRNA)\
-				-I /usr/lib/gcc/x86_64-redhat-linux/4.6.1/include
+DIRS = -I $(ViennaRNA)
 
 LIBS = $(ViennaLIB)
 

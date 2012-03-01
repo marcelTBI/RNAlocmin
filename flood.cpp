@@ -14,8 +14,6 @@ extern "C" {
 extern short* allocopy(short *src);
 extern void copy_arr(short *dest, short *src);
 
-//#define MAXFLOOD 1000
-
 // global priority queue for stuff in flooding (does not hold memory, thus should not be freed (thats done in hash))
 priority_queue<hash_entry*, vector<hash_entry*>, compare_queue> neighs;
 int energy_lvl;
@@ -28,7 +26,7 @@ bool compare_vect (const hash_entry &lhs, const hash_entry &rhs){
   }
   // then structures (here we have structures as numbers, but we want to compare them as chars in bractet dot notation: "()." )
   int i=1;
-  char l,r;
+  char l=0,r=0;
   while (i<=lhs.structure[0]) {
     l = (lhs.structure[i]==0?'.':(lhs.structure[i]<lhs.structure[lhs.structure[i]]?'(':')'));
     r = (rhs.structure[i]==0?'.':(rhs.structure[i]<rhs.structure[rhs.structure[i]]?'(':')'));
@@ -108,7 +106,7 @@ hash_entry* flood(encoded &enc, int energy, options &opt, int &saddle_en)
   hash_entry *ret = NULL;
 
   // FLOOOD!
-  while (hash_size() < MAXFLOOD) {
+  while ((int)hash_size() < opt.floodMax) {
     // should not be empty
     if (neighs.empty()) break;
 

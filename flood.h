@@ -13,7 +13,7 @@ struct compare_map {
     }
     // then structures (here we have structures as numbers, but we want to compare them as chars in bractet dot notation: "()." )
     int i=1;
-    char l,r;
+    char l=0,r=0;
     while (i<=lhs.structure[0]) {
       l = (lhs.structure[i]==0?'.':(lhs.structure[i]<lhs.structure[lhs.structure[i]]?'(':')'));
       r = (rhs.structure[i]==0?'.':(rhs.structure[i]<rhs.structure[rhs.structure[i]]?'(':')'));
@@ -32,7 +32,7 @@ struct compare_queue {
     }
     // then structures (here we have structures as numbers, but we want to compare them as chars in bractet dot notation: "()." )
     int i=1;
-    char l,r;
+    char l=0,r=0;
     while (i<=lhs->structure[0]) {
       l = (lhs->structure[i]==0?'.':(lhs->structure[i]<lhs->structure[lhs->structure[i]]?'(':')'));
       r = (rhs->structure[i]==0?'.':(rhs->structure[i]<rhs->structure[rhs->structure[i]]?'(':')'));

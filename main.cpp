@@ -23,9 +23,6 @@ extern "C" {
 
 #include "barrier_tree.h"
 
-extern short* allocopy(short *src);
-extern void copy_arr(short *desc, short *src);
-
 using namespace std;
 
 // are arguments bad?
@@ -45,16 +42,20 @@ option "noLP"               - "Work with canonical RNA structures (w/o isolated 
 option "bartree"            b "Generate possible barrier tree" flag off
 option "useEOS"             e "Use energy_of_structure_pt calculation instead of energy_of_move (slower, it should not affect results)" flag off
 option "useFirst"           - "Use first found lower energy structure instead of deepest" flag off
-option "floodPortion"       - "Fraction of minima to flood\n(0.0 -> no flood; 1.0 -> try to flood all of them)" double default="0.95" no*/
+option "floodPortion"       - "Fraction of minima to flood\n(0.0 -> no flood; 1.0 -> try to flood all of them)" double default="0.95" no
+option "floodMax"           - "Flood cap - how many structures to flood in one basin" int default="1000" no
+*/
+
+  int ret = 0;
 
   if (args_info.min_num_arg<=0) {
     fprintf(stderr, "Number of local minima should be positive integer (min-num)\\n");
-    return -1;
+    ret = -1;
   }
 
   if (args_info.find_num_given && args_info.find_num_arg<=0) {
     fprintf(stderr, "Number of local minima should be positive integer (find-num)\n");
-    return -1;
+    ret = -1;
   }
 
   if (args_info.verbose_lvl_arg<0 || args_info.verbose_lvl_arg>4) {
@@ -65,27 +66,30 @@ option "floodPortion"       - "Fraction of minima to flood\n(0.0 -> no flood; 1.
 
   if (args_info.temp_arg<-273.15) {
     fprintf(stderr, "Temperature cannot be below absolute zero\n");
-    return -1;
+    ret = -1;
+  }
+
+  if (args_info.floodMax_arg<0) {
+    fprintf(stderr, "Flood cap must be non-negative\n");
+    ret = -1;
   }
 
   if (args_info.floodPortion_arg<0.0 || args_info.floodPortion_arg>1.0) {
     args_info.floodPortion_arg = (args_info.floodPortion_arg<0.0 ? 0.0 : 1.0);
     fprintf(stderr, "WARNING: floodPortion is not in range (0.0-1.0), setting it to %.1f\n", args_info.floodPortion_arg);
-    return -1;
   }
 
   if (args_info.depth_arg<=0) {
     fprintf(stderr, "Depth of findpath search should be positive integer\n");
-    return -1;
+    ret = -1;
   }
 
   if (args_info.minh_arg<0.0) {
     fprintf(stderr, "Depth of findpath search should be non-negative number\n");
-    return -1;
+    ret = -1;
   }
 
-  // everything ok
-  return 0;
+  return ret;
 }
 
 static int num_moves = 0;
@@ -200,6 +204,7 @@ int main(int argc, char **argv)
   opt.f_point = NULL;
   opt.shift = args_info.move_arg[0]=='S';
   opt.verbose_lvl = args_info.verbose_lvl_arg;
+  opt.floodMax = args_info.floodMax_arg;
 
   // read sequence
   FILE *fseq;
