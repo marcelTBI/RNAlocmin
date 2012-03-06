@@ -1,6 +1,8 @@
 # Name of your program
 package "RNAlocmin" # don't use package if you're using automake
-purpose "Calculate local minima from RNAsubopt -p output file"
+purpose "Calculate local minima from RNAsubopt -p output file. Example usage: \n\
+    RNAsubopt -p 10000 < \"sequence.txt\" > \"suboptp.txt\"\n\
+    RNAlocmin -s \"sequence.txt\" [OPTIONS] < \"suboptp.txt\""
 
 # Version of your program
 version "0.1"   # don't use version if you're using automake
@@ -10,17 +12,19 @@ args "--file-name=RNAlocmin_cmdline --include-getopt --default-optional --unamed
 
 # Options
 section "General options"
+option "seq"                s "Sequence file in FASTA format" string default="seq.txt"
 option "move"               m "Move set:\nI ==> insertion & deletion of base pair\nS ==> I&D& switch base pair" values="I","S" default="I" no
 option "min-num"            n "Maximal number of local minima returned" int default="100" no
 option "find-num"           - "Maximal number of local minima found \n  (default = unlimited - crawl through whole file)" int no
-option "seq"                s "Sequence file in FASTA format" string default="seq.txt"
 option "verbose-lvl"        v "Level of verbosity (0 = nothing, 4 = full)\n WARNING: higher verbose levels increase computation time" int default="0" no
 option "depth"              d "Depth of findpath search (higher value increases running time)" int default="10" no
-option "minh"               - "Print only minima with energy barrier greater than this (untested)" double default="0.0" no
+option "minh"               - "Print only minima with energy barrier greater than this (untested)" double default="0.0" no hidden
 option "noLP"               - "Work only with canonical RNA structures (w/o isolated base pairs)" flag off
-option "bartree"            b "Generate possible barrier tree" flag off
 option "useEOS"             e "Use energy_of_structure_pt calculation instead of energy_of_move (slower, it should not affect results)" flag off
 option "useFirst"           - "Use first found lower energy structure instead of deepest during walk down" flag off
+section "Barrier tree"
+option "bartree"            b "Generate possible barrier tree" flag off
+option "barr-name"          - "Name of barrier tree output file" string default="treeRNAloc.ps"
 section "Kinetics (rates for treekin program)"
 option "rates"              r "Create rates for treekin" flag off
 option "rates-file"         f "File where to write rates" string default="rates.out" no

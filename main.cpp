@@ -328,7 +328,7 @@ int main(int argc, char **argv)
       // flood only if low number of walks ended there
       if (output_num[i]<=threshold) {
         copy_arr(enc->pt, output_he[i].structure);
-        fprintf(stderr,   "flooding  (%3d): %s %.2f\n", i, output_str[i].c_str(), output_he[i].energy/100.0);
+        if (args_info.verbose_lvl_arg>1) fprintf(stderr,   "flooding  (%3d): %s %.2f\n", i, output_str[i].c_str(), output_he[i].energy/100.0);
 
         int saddle;
         hash_entry *he = flood(*enc, output_he[i].energy, opt, saddle);
@@ -374,7 +374,7 @@ int main(int argc, char **argv)
 
           if (it!=output_he.end()) {
             int pos = (int)(it-output_he.begin());
-            fprintf(stderr, "found father at pos: %d\n", pos);
+            if (args_info.verbose_lvl_arg>1) fprintf(stderr, "found father at pos: %d\n", pos);
 
             // which one is father?
             bool res_higher = compare_vect(output_he[i], output_he[pos]); // is found minima higher in energy than flooded min?
@@ -406,14 +406,8 @@ int main(int argc, char **argv)
 
             flooded++;
             energy_barr[i*num+pos] = energy_barr[pos*num+i] = saddle/100.0;
-          } else {
-            fprintf(stderr, "minimum not found: %s %.2f\n", pt_to_str(he_tmp.structure).c_str(), he_tmp.energy/100.0);
           }
-        } else {
-          fprintf(stderr, "flood unsuccesful!\n");
         }
-
-
       }
     }
 
@@ -486,7 +480,7 @@ int main(int argc, char **argv)
     make_tree(num, energy_barr, nodes);
 
     // plot it!
-    PS_tree_plot(nodes, num, "treeLocmin.ps");
+    PS_tree_plot(nodes, num, args_info.barr_name_arg);
   }
 
     // time?
