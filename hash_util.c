@@ -263,7 +263,7 @@ PUBLIC void print_stats()
     }
   }
 
-  mean /= (double)count/100.0;
+  mean /= (double)count*100.0;
   entropy = entropy/(double)count - log(count);
 
   fprintf(stderr, "Mean  : %.3f\n"

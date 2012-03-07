@@ -320,6 +320,7 @@ int main(int argc, char **argv)
       nodes[i].father = -1;
       nodes[i].height = output_en[i]/100.0;
       nodes[i].label = NULL;
+      nodes[i].color = 0.0;
     }
 
     int flooded = 0;
@@ -328,7 +329,7 @@ int main(int argc, char **argv)
       // flood only if low number of walks ended there
       if (output_num[i]<=threshold) {
         copy_arr(enc->pt, output_he[i].structure);
-        if (args_info.verbose_lvl_arg>1) fprintf(stderr,   "flooding  (%3d): %s %.2f\n", i, output_str[i].c_str(), output_he[i].energy/100.0);
+        if (args_info.verbose_lvl_arg>2) fprintf(stderr,   "flooding  (%3d): %s %.2f\n", i, output_str[i].c_str(), output_he[i].energy/100.0);
 
         int saddle;
         hash_entry *he = flood(*enc, output_he[i].energy, opt, saddle);
@@ -382,6 +383,7 @@ int main(int argc, char **argv)
             int child = (res_higher ? pos:i);
 
             nodes[i].saddle_height = saddle/100.0; // this is always true
+            //nodes[i].color = 0.5;
 
             // some father issues
             int chng_child, chng_father;
@@ -401,7 +403,7 @@ int main(int argc, char **argv)
 
             // add new one and recompute existing fathers
             if (nodes[chng_child].father != father) {
-              add_father(nodes, chng_child, chng_father);
+              add_father(nodes, chng_child, chng_father, 0.0);
             }
 
             flooded++;

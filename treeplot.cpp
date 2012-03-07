@@ -169,10 +169,11 @@ void PS_tree_plot(nodeT *nodes, int n, char *filename) {
           "  } def\n"
 	  "%% - => -\n"
 	  "  /Connectlmins {\n"
-	  "    newpath\n"
 	  "    SADDEL {\n"
+	  "    newpath\n"
 	  "      /forest {false} def  %%  draw as tree or forest node\n"
 	  "      aload pop exch dup 0 lt { pop 0 /forest {true} def} if"
+    "      3 index setgray\n"
 	  "   %% => c h f\n"
 	  "      dup LX exch get [ exch LX 5 index get add 2 div "
 	  "%% => c h f [ nx\n"
@@ -185,10 +186,11 @@ void PS_tree_plot(nodeT *nodes, int n, char *filename) {
 	  "      2 index forest {moveto} {lineto} ifelse \n"
 	  "      sub neg Rlineto\t\t\t         %% => f [] h fy\n"
 	  "      LEAF 3 1 roll put\n"
-	  "    } forall\n"
-	  "    gsave\n"
+    "    gsave\n"
+    "      setgray\n"
 	  "      cmtx setmatrix stroke\n"
 	  "    grestore\n"
+	  "    } forall\n"
 	  "  } def\n"
 	  "%% data starts here!!!\n"
 	  "  /LABEL [");
@@ -221,7 +223,8 @@ void PS_tree_plot(nodeT *nodes, int n, char *filename) {
     /* int fath; */
     if (i%4 == 0)  fprintf(out, "\n   ");
     k=sindex[i]; if (k==nodes[k].father) continue;
-    fprintf(out, "[%3d %3d %7.3f] ",k,nodes[k].father, nodes[k].saddle_height);
+    fprintf(out, "[%3.1f %3d %3d %7.3f] ",nodes[k].color, k, nodes[k].father, nodes[k].saddle_height);
+    //fprintf(out, "[%3d %3d %7.3f] ",k, nodes[k].father, nodes[k].saddle_height);
   }
   free(chain);  free(sindex);
   fprintf(out,
@@ -237,7 +240,7 @@ void PS_tree_plot(nodeT *nodes, int n, char *filename) {
   fprintf(out, "  %d %d sub LEAF length div %% x-scale\n", bbox[0], bbox[2]-1);
   fprintf(out, "  %d %d fsize dup add add sub\n", bbox[3]-1, bbox[1]);
   fprintf(out,
-	  "  SADDEL dup length 1 sub get 2 get /maxy exch def %% max height\n"
+	  "  SADDEL dup length 1 sub get 3 get /maxy exch def %% max height\n"
 	  "  9999999 LEAF { aload pop exch pop min } forall\n"
 	  "  /miny exch def %% min height\n"
 	  /* "  LEAF 0 get 1 get /miny exch def %% min height\n" */

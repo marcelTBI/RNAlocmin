@@ -119,11 +119,11 @@ hash_entry* flood(encoded &enc, int energy, options &opt, int &saddle_en)
     copy_arr(enc.pt, he_tmp->structure);
     energy = he_tmp->energy;
 
-    if (opt.verbose_lvl>1) fprintf(stderr, "  neighbours of: %s %.2f\n", pt_to_str(enc.pt).c_str(), he_tmp->energy/100.0);
+    if (opt.verbose_lvl>2) fprintf(stderr, "  neighbours of: %s %.2f\n", pt_to_str(enc.pt).c_str(), he_tmp->energy/100.0);
 
     bool escape = browse_neighs(enc, energy, deg, saddle_en);
 
-    if (opt.verbose_lvl>1) fprintf(stderr, "sad= %6.2f (%c): %s %.2f\n", saddle_en/100.0, (escape?'t':'f'), pt_to_str(enc.pt).c_str(), energy/100.0);
+    if (opt.verbose_lvl>2) fprintf(stderr, "sad= %6.2f (%c): %s %.2f\n", saddle_en/100.0, (escape?'t':'f'), pt_to_str(enc.pt).c_str(), energy/100.0);
 
     // did we find exit from basin?
     if (escape) {

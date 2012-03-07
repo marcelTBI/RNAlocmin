@@ -10,6 +10,7 @@ typedef struct {
   float height;         /* height (energy, time, whatever) of this leaf    */
   float saddle_height;  /* height of internal node that connects this leaf */
   int father;           /* node with which it connects                     */
+  float color;            /* color of the connection 0=black 1=white         */
   char *label;          /* label string, if NULL use index+1               */
   set<int> children;        /* set of children */
 } nodeT;

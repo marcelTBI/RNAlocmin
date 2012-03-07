@@ -57,7 +57,7 @@ int make_tree(int n, float *energy_barr, nodeT *nodes)
       // merge i and j by their fathers
       if (fatheri>fatherj) swap(fatheri, fatherj);
       nodes[fatherj].saddle_height = ep.barrier;
-      add_father(nodes, fatherj, fatheri);
+      add_father(nodes, fatherj, fatheri, 0.5);
       //nodes[fatherj].father = fatheri;
       if (ep.barrier>max_height) max_height = ep.barrier;
     }
@@ -65,12 +65,13 @@ int make_tree(int n, float *energy_barr, nodeT *nodes)
 
   // finish the last one
   nodes[0].saddle_height = max_height + 0.1;
+  nodes[0].color = 0.5;
 
   return 0;
 }
 
 
-void add_father(nodeT *nodes, int child, int father)
+void add_father(nodeT *nodes, int child, int father, double color)
 {
   //search for old father
   int old_father = nodes[child].father;
@@ -81,6 +82,7 @@ void add_father(nodeT *nodes, int child, int father)
 
   // add new one
   nodes[child].father = father;
+  if (color>=0.0) nodes[child].color = color;
   nodes[father].children.insert(child);
 
   // recompute others
@@ -89,7 +91,7 @@ void add_father(nodeT *nodes, int child, int father)
     if (nodes[*it].saddle_height > nodes[child].saddle_height) {
 
       //nodes[*it].father = father;
-      add_father(nodes, *it, father);
+      add_father(nodes, *it, father, -1.0);
     }
   }
 }
