@@ -21,14 +21,11 @@ extern "C" {
 static int cnt_move = 0;
 int count_move() {return cnt_move;}
 
-// array for energy_of_move
-short *min_pt;
-
 // compatible base pair?
 inline bool compat(char a, char b);
 
 // done with all structures along the way to deepest
-int update_deepest(encoded &enc, float &deepest, short *pt, degen &deg, bool verbose);
+int update_deepest(Encoded &Enc, float &deepest, short *pt, degen &deg, bool verbose);
 
 // if the base is lone
 inline bool lone_base(short *pt, int i);
@@ -70,166 +67,70 @@ inline bool compat(char a, char b) {
   return false;
 }
 
-// create encoded structure
-encoded *encode_seq(const char* seq)
-{
-  encoded *res;
-  res = (encoded*) space(sizeof(encoded));
-
-  // inicialize encode_sequence
-  make_pair_matrix();
-
-  res->seq = seq;
-
-  res->pt = NULL;
-  res->s0   = encode_sequence(seq, 0);
-  res->s1   = encode_sequence(seq, 1);
-
-  res->bp_left = 0;
-  res->bp_right = 0;
-  res->bp_left2 = 0;
-  res->bp_right2 = 0;
-
-  return res;
-}
-
-void encode_str(encoded *enc, const char *str)
-{
-  if (enc->pt) free(enc->pt);
-  enc->pt = make_pair_table(str);
-}
-
-inline void forget(encoded &enc)
-{
-  enc.bp_left=0;
-  enc.bp_right=0;
-  enc.bp_left2=0;
-  enc.bp_right2=0;
-}
-
-void free_encode(encoded *enc)
-{
-  if (enc) {
-    if (enc->s0) free(enc->s0);
-    if (enc->s1) free(enc->s1);
-    if (enc->pt) free(enc->pt);
-    free(enc);
-  }
-}
-
-inline void do_move(short *pt, int bp_left, int bp_right)
-{
-  // delete
-  if (bp_left<0) {
-    pt[-bp_left]=0;
-    pt[-bp_right]=0;
-  } else { // insert
-    pt[bp_left]=bp_right;
-    pt[bp_right]=bp_left;
-  }
-}
-
-inline void do_moves(encoded &enc, bool first = true, bool second = true)
-{
-  if (first && enc.bp_left != 0) {
-    do_move(enc.pt, enc.bp_left, enc.bp_right);
-  }
-
-  if (second && enc.bp_left2 != 0) {
-    do_move(enc.pt, enc.bp_left2, enc.bp_right2);
-  }
-}
-
-inline void undo_moves(encoded &enc, bool first = true, bool second = true)
-{
-  if (second && enc.bp_left2 != 0) {
-    do_move(enc.pt, -enc.bp_left2, -enc.bp_right2);
-  }
-  if (first && enc.bp_left != 0) {
-    do_move(enc.pt, -enc.bp_left, -enc.bp_right);
-  }
-
-  forget(enc);
-}
-
-inline void undo_move(short *pt, int bp_left, int bp_right)
-{
-  // do insert = undo delete
-  do_move(pt, -bp_left, -bp_right);
-}
-
 // done with all structures along the way to deepest
-int update_deepest(encoded &enc, int &deepest, short *min_pt, degen &deg, bool verbose)
+int update_deepest(int &deepest, short *min_pt)
 {
   // debug
   /*if (deg.opt->f_point) {
-    fprintf(stderr, "UD: %s %.2f (%d, %d) (%d, %d)\n", pt_to_str(enc.pt).c_str(), deepest/100.0, enc.bp_left, enc.bp_right, enc.bp_left2, enc.bp_right2);
+    fprintf(stderr, "UD: %s %.2f (%d, %d) (%d, %d)\n", pt_to_str(Enc.pt).c_str(), deepest/100.0, Enc.bp_left, Enc.bp_right, Enc.bp_left2, Enc.bp_right2);
   }*/
 
+  bool verbose = Opt.verbose_lvl>3;
+
   int tmp_en;
-  if (deg.opt->EOM) {
-    tmp_en = deg.current + energy_of_move_pt(enc.pt, enc.s0, enc.s1, enc.bp_left, enc.bp_right);
-    do_moves(enc, true, false);
-    if (enc.bp_left2 != 0) {
-      tmp_en += energy_of_move_pt(enc.pt, enc.s0, enc.s1, enc.bp_left2, enc.bp_right2);
-      do_moves(enc, false, true);
-    }
-  } else {
-    do_moves(enc);
-    tmp_en = energy_of_structure_pt(enc.seq, enc.pt, enc.s0, enc.s1, 0);
-  }
+  tmp_en = Enc.EnergyOfMove();
 
   //use f_point if we have it; (flooding)
   if (deg.opt->f_point) {
-    bool end = deg.opt->f_point(enc.pt, tmp_en);
+    bool end = deg.opt->f_point(Enc.pt, tmp_en);
 
     // if we continue - revert changes
     if (!end) {
-      undo_moves(enc);
+      undo_moves(Enc);
       return 0;
     } else {
       deepest = tmp_en;
-      forget(enc);
+      forget(Enc);
       return 1;
     }
   }
 
-  if (verbose) fprintf(stderr, "  %s %d\n", pt_to_str(enc.pt).c_str(), tmp_en);
+  if (verbose) fprintf(stderr, "  %s %d\n", pt_to_str(Enc.pt).c_str(), tmp_en);
   // better deepest
   if (tmp_en < deepest) {
     deepest = tmp_en;
-    copy_arr(min_pt, enc.pt);
+    copy_arr(min_pt, Enc.pt);
 
     // delete degeneracy
-    erase_set(deg.processed);
-    erase_set(deg.unprocessed);
+    Deg.Clear();
 
-    undo_moves(enc);
+    Enc.UndoMove();
+
     return 1;
   }
 
   // degeneracy
-  if ((abs(deepest - deg.current) <= deg.opt->minh) && (abs(tmp_en - deg.current) <= deg.opt->minh)) {
-    if (deg.processed.count(enc.pt)==0 && deg.unprocessed.count(enc.pt)==0) {
-      deg.unprocessed.insert(allocopy(enc.pt));
+  if ((abs(deepest - deg.current) <= 0) && (abs(tmp_en - deg.current) <= 0)) {
+    if (deg.processed.count(Enc.pt)==0 && deg.unprocessed.count(Enc.pt)==0) {
+      deg.unprocessed.insert(allocopy(Enc.pt));
     }
   }
-  undo_moves(enc);
+  Enc.UndoMove();
   return 0;
 }
 
 
 // deletions move set
-int deletions(encoded &enc, int &deepest, short *min_pt, degen &deg, bool verbose)
+int deletions(Encoded &Enc, int &deepest, short *min_pt, degen &deg, bool verbose)
 {
   int cnt = 0;
-  short *pt = enc.pt;
+  short *pt = Enc.pt;
   int len = pt[0];
 
   for (int i=1; i<=len; i++) {
     if (pt[i]>pt[pt[i]]) {  // '('
-      enc.bp_left=-i;
-      enc.bp_right=-pt[i];
+      Enc.bp_left=-i;
+      Enc.bp_right=-pt[i];
 
       //if nolp enabled, make (maybe) 2nd delete
       if (deg.opt->noLP) {
@@ -245,16 +146,16 @@ int deletions(encoded &enc, int &deepest, short *min_pt, degen &deg, bool verbos
         }
 
         if (lone != -1) {
-          enc.bp_left2=-lone-1;
-          enc.bp_right2=-pt[lone]-1;
+          Enc.bp_left2=-lone-1;
+          Enc.bp_right2=-pt[lone]-1;
         }
         if (!lone_base(pt, pt[lone]-1) && !lone_base(pt, pt[lone]+1)) {
-          cnt += update_deepest(enc, deepest, min_pt, deg, verbose);
+          cnt += update_deepest(Enc, deepest, min_pt, deg, verbose);
           // in case useFirst is on and structure is found, end
           if (deg.opt->first && cnt > 0) return cnt;
         }
       } else {  // nolp not enabled
-        cnt += update_deepest(enc, deepest, min_pt, deg, verbose);
+        cnt += update_deepest(Enc, deepest, min_pt, deg, verbose);
         // in case useFirst is on and structure is found, end
         if (deg.opt->first && cnt > 0) return cnt;
       }
@@ -264,10 +165,10 @@ int deletions(encoded &enc, int &deepest, short *min_pt, degen &deg, bool verbos
 }
 
 // insertions move set
-int insertions(encoded &enc, int &deepest, short *min_pt, degen &deg, bool verbose)
+int insertions(Encoded &Enc, int &deepest, short *min_pt, degen &deg, bool verbose)
 {
   int cnt = 0;
-  short *pt = enc.pt;
+  short *pt = Enc.pt;
   int len = pt[0];
 
   for (int i=1; i<=len; i++) {
@@ -280,35 +181,35 @@ int insertions(encoded &enc, int &deepest, short *min_pt, degen &deg, bool verbo
           continue;
         }
         // if conditions are met, do insert
-        if (try_insert(pt, enc.seq, i, j)) {
-          enc.bp_left=i;
-          enc.bp_right=j;
+        if (try_insert(pt, Enc.seq, i, j)) {
+          Enc.bp_left=i;
+          Enc.bp_right=j;
 
           if (deg.opt->noLP) {
             // if lone bases occur, try inserting one another base
             if (lone_base(pt, i) || lone_base(pt, j)) {
               // inside
-              if (try_insert(pt, enc.seq, i+1, j-1)) {
-                  enc.bp_left2=i+1;
-                  enc.bp_right2=j-1;
-                cnt += update_deepest(enc, deepest, min_pt, deg, verbose);
+              if (try_insert(pt, Enc.seq, i+1, j-1)) {
+                  Enc.bp_left2=i+1;
+                  Enc.bp_right2=j-1;
+                cnt += update_deepest(Enc, deepest, min_pt, deg, verbose);
                 // in case useFirst is on and structure is found, end
                 if (deg.opt->first && cnt > 0) return cnt;
               } else  //outside
-              if (try_insert(pt, enc.seq, i-1, j+1)) {
-                enc.bp_left2=i-1;
-                enc.bp_right2=j+1;
-                cnt += update_deepest(enc, deepest, min_pt, deg, verbose);
+              if (try_insert(pt, Enc.seq, i-1, j+1)) {
+                Enc.bp_left2=i-1;
+                Enc.bp_right2=j+1;
+                cnt += update_deepest(Enc, deepest, min_pt, deg, verbose);
                 // in case useFirst is on and structure is found, end
                 if (deg.opt->first && cnt > 0) return cnt;
               }
             } else {
-              cnt += update_deepest(enc, deepest, min_pt, deg, verbose);
+              cnt += update_deepest(Enc, deepest, min_pt, deg, verbose);
               // in case useFirst is on and structure is found, end
               if (deg.opt->first && cnt > 0) return cnt;
             }
           } else {
-            cnt += update_deepest(enc, deepest, min_pt, deg, verbose);
+            cnt += update_deepest(Enc, deepest, min_pt, deg, verbose);
             // in case useFirst is on and structure is found, end
             if (deg.opt->first && cnt > 0) return cnt;
           }
@@ -320,12 +221,14 @@ int insertions(encoded &enc, int &deepest, short *min_pt, degen &deg, bool verbo
 }
 
 //shift move set
-int shifts(encoded &enc, int &deepest, short *min_pt, degen &deg, bool verbose)
+int shifts(int &deepest, short *min_pt)
 {
   int cnt = 0;
   int brack_num = 0;
-  short *pt = enc.pt;
+  short *pt = Enc.pt;
   int len = pt[0];
+
+  bool verbose = Opt.verbose_lvl>3;
 
   for (int i=1; i<=len; i++) {
     if (pt[i]!=0 && pt[i]>i) {  //'('
@@ -345,23 +248,23 @@ int shifts(encoded &enc, int &deepest, short *min_pt, degen &deg, bool verbose)
         }
 
         // switch (i,j) to (k,j)
-        if (j-k>MINGAP && compat(enc.seq[k-1], enc.seq[j-1])) {
-          enc.bp_left=-i;
-          enc.bp_right=-j;
-          enc.bp_left2=k;
-          enc.bp_right2=j;
-          cnt += update_deepest(enc, deepest, min_pt, deg, verbose);
+        if (j-k>MINGAP && compat(Enc.seq[k-1], Enc.seq[j-1])) {
+          Enc.bp_left=-i;
+          Enc.bp_right=-j;
+          Enc.bp_left2=k;
+          Enc.bp_right2=j;
+          cnt += update_deepest(Enc, deepest, min_pt, deg, verbose);
           // in case useFirst is on and structure is found, end
           if (deg.opt->first && cnt > 0) return cnt;
         }
 
         // switch (i,j) to (k,i)
-        if (i-k>MINGAP && compat(enc.seq[i-1], enc.seq[k-1])) {
-          enc.bp_left=-i;
-          enc.bp_right=-j;
-          enc.bp_left2=k;
-          enc.bp_right2=i;
-          cnt += update_deepest(enc, deepest, min_pt, deg, verbose);
+        if (i-k>MINGAP && compat(Enc.seq[i-1], Enc.seq[k-1])) {
+          Enc.bp_left=-i;
+          Enc.bp_right=-j;
+          Enc.bp_left2=k;
+          Enc.bp_right2=i;
+          cnt += update_deepest(Enc, deepest, min_pt, deg, verbose);
           // in case useFirst is on and structure is found, end
           if (deg.opt->first && cnt > 0) return cnt;
 
@@ -382,22 +285,22 @@ int shifts(encoded &enc, int &deepest, short *min_pt, degen &deg, bool verbose)
           fprintf(stderr, "WARNING: \'%c\'should be \'.\' at pos %d!\n", pt[k], k);
         }
         // switch (i,j) to (i,k)
-        if (k-i>MINGAP && compat(enc.seq[i-1], enc.seq[k-1])) {
-          enc.bp_left=-i;
-          enc.bp_right=-j;
-          enc.bp_left2=i;
-          enc.bp_right2=k;
-          cnt += update_deepest(enc, deepest, min_pt, deg, verbose);
+        if (k-i>MINGAP && compat(Enc.seq[i-1], Enc.seq[k-1])) {
+          Enc.bp_left=-i;
+          Enc.bp_right=-j;
+          Enc.bp_left2=i;
+          Enc.bp_right2=k;
+          cnt += update_deepest(Enc, deepest, min_pt, deg, verbose);
           // in case useFirst is on and structure is found, end
           if (deg.opt->first && cnt > 0) return cnt;
         }
         // switch (i,j) to (j,k)
-        if (k-j>MINGAP && compat(enc.seq[j-1], enc.seq[k-1])) {
-          enc.bp_left=-i;
-          enc.bp_right=-j;
-          enc.bp_left2=j;
-          enc.bp_right2=k;
-          cnt += update_deepest(enc, deepest, min_pt, deg, verbose);
+        if (k-j>MINGAP && compat(Enc.seq[j-1], Enc.seq[k-1])) {
+          Enc.bp_left=-i;
+          Enc.bp_right=-j;
+          Enc.bp_left2=j;
+          Enc.bp_right2=k;
+          cnt += update_deepest(Enc, deepest, min_pt, deg, verbose);
           // in case useFirst is on and structure is found, end
           if (deg.opt->first && cnt > 0) return cnt;
         }
@@ -413,23 +316,23 @@ int shifts(encoded &enc, int &deepest, short *min_pt, degen &deg, bool verbose)
         }
 
         // left switch (i,j) to (k,j)
-        if (j-k>MINGAP && compat(enc.seq[k-1], enc.seq[j-1])) {
-          enc.bp_left=-i;
-          enc.bp_right=-j;
-          enc.bp_left2=k;
-          enc.bp_right2=j;
-          cnt += update_deepest(enc, deepest, min_pt, deg, verbose);
+        if (j-k>MINGAP && compat(Enc.seq[k-1], Enc.seq[j-1])) {
+          Enc.bp_left=-i;
+          Enc.bp_right=-j;
+          Enc.bp_left2=k;
+          Enc.bp_right2=j;
+          cnt += update_deepest(Enc, deepest, min_pt, deg, verbose);
           // in case useFirst is on and structure is found, end
           if (deg.opt->first && cnt > 0) return cnt;
         }
 
         // right switch (i,j) to (i,k)
-        if (k-i>MINGAP && compat(enc.seq[i-1], enc.seq[k-1])) {
-          enc.bp_left=-i;
-          enc.bp_right=-j;
-          enc.bp_left2=i;
-          enc.bp_right2=k;
-          cnt += update_deepest(enc, deepest, min_pt, deg, verbose);
+        if (k-i>MINGAP && compat(Enc.seq[i-1], Enc.seq[k-1])) {
+          Enc.bp_left=-i;
+          Enc.bp_right=-j;
+          Enc.bp_left2=i;
+          Enc.bp_right2=k;
+          cnt += update_deepest(Enc, deepest, min_pt, deg, verbose);
           // in case useFirst is on and structure is found, end
           if (deg.opt->first && cnt > 0) return cnt;
         }
@@ -440,32 +343,8 @@ int shifts(encoded &enc, int &deepest, short *min_pt, degen &deg, bool verbose)
   return cnt;
 }
 
-void copy_arr(short *dest, short *src)
-{
-  if (!src || !dest) {
-    fprintf(stderr, "Empty pointer in copying\n");
-    return;
-  }
-  memcpy(dest, src, sizeof(short)*(src[0]+1));
-}
-
-short *allocopy(short *src)
-{
-  short *res = (short*) space(sizeof(short)*(src[0]+1));
-  copy_arr(res, src);
-  return res;
-}
-
-void erase_set(set<short*, setcomp> &_set)
-{
-   for (set<short*, setcomp>::iterator it=_set.begin(); it!=_set.end(); it++) {
-    if (*it) free(*it);
-   }
-   _set.clear();
-}
-
 // move to deepest (or first) neighbour
-int move_set(encoded &enc, int &deepest, degen &deg)
+int move_set(hash_entry &str)
 {
   // count how many times called
   cnt_move++;
@@ -474,87 +353,90 @@ int move_set(encoded &enc, int &deepest, degen &deg)
   int cnt = 0;
 
   // deepest descent
-  deg.current = deepest;
-  short *min_pt = allocopy(enc.pt);
+  hash_entry min;
+  min.structure = allocopy(str.structure);
+  min.energy = str.energy;
 
-  if (deg.opt->verbose_lvl>3) fprintf(stderr, "\n  start of MS:\n  %s %d\n\n", pt_to_str(enc.pt).c_str(), deepest);
+  if (deg.opt->verbose_lvl>3) fprintf(stderr, "\n  start of MS:\n  %s %d\n\n", pt_to_str(min.structure).c_str(), deepest);
 
   // if using first dont do all of them
   bool end = false;
   // insertions
-  if (!end) cnt += insertions(enc, deepest, min_pt, deg, deg.opt->verbose_lvl>3);
-  if (deg.opt->first && cnt>0) end = true;
-  if (deg.opt->verbose_lvl>3) fprintf(stderr, "\n");
+  if (!end) cnt += insertions(str, min);
+  if (Opt.first && cnt>0) end = true;
+  if (Opt.verbose_lvl>3) fprintf(stderr, "\n");
 
   // deletions
-  if (!end) cnt += deletions(enc, deepest, min_pt, deg, deg.opt->verbose_lvl>3);
-  if (deg.opt->first && cnt>0) end = true;
+  if (!end) cnt += deletions(str, min);
+  if (Opt.first && cnt>0) end = true;
 
   // shifts (only if enabled + noLP disabled)
-  if (!end && deg.opt->shift && !deg.opt->noLP) {
-    cnt += shifts(enc, deepest, min_pt, deg, deg.opt->verbose_lvl>3);
-    if (deg.opt->first && cnt>0) end = true;
+  if (!end && Opt.shift && !Opt.noLP) {
+    cnt += shifts(str, min);
+    if (Opt.first && cnt>0) end = true;
   }
 
-  if (deg.opt->verbose_lvl>3) fprintf(stderr, "\n  %s\n  %s\n", enc.seq, pt_to_str(min_pt).c_str());
+  if (Opt.verbose_lvl>3) fprintf(stderr, "\n  %s\n  %s\n", Enc.seq, pt_to_str(min.structure).c_str());
 
   // if degeneracy occurs, solve it!
-  if (!end && deg.unprocessed.size()>0) {
-    deg.processed.insert(allocopy(enc.pt));
-    // take first
-    if (enc.pt) free(enc.pt);
-    enc.pt = (*deg.unprocessed.begin());
-    deg.unprocessed.erase(deg.unprocessed.begin());
-    if (deg.opt->minh>0.1001) {
-      deepest = energy_of_structure_pt(enc.seq, enc.pt, enc.s0, enc.s1, 0);
-    }
-    cnt += move_set(enc, deepest, deg);
+  if (!end && Deg.unprocessed.size()>0) {
+    Deg.current = str.energy;  // should be true nevertheless
+    Deg.processed.insert(allocopy(str.structure));
+    // take first to structure
+    if (str.structure) free(str.structure);
+    str.structure = (*Deg.unprocessed.begin());
+    Deg.unprocessed.erase(Deg.unprocessed.begin());
+    cnt += move_set(str);
   } else {
-    copy_arr(enc.pt, min_pt);
+    // write output to str
+    copy_arr(str.structure, min.structure);
+    str.energy = deepest;
   }
-  free(min_pt);
+  // release minimal
+  free(min.structure);
 
   // resolve degeneracy in local minima
-  if (deg.processed.size()>0) {
-    deg.processed.insert(enc.pt);
-    enc.pt = *deg.processed.begin();
-    deg.processed.erase(deg.processed.begin());
+  if (Deg.processed.size()>0) {
+    Deg.processed.insert(str.stucture);
+    str.structure = *Deg.processed.begin();
+    str.energy = Deg.current; // should be true nevertheless
+    Deg.processed.erase(Deg.processed.begin());
 
-    erase_set(deg.processed);
+    erase_set(Deg.processed);
   }
 
   return cnt;
 }
 
-// browse neighbours without degeneracy (almost the same as move_set) assume deg.first = true
-bool browse_neighs(encoded &enc, int &energy, degen &deg, int &saddle_en)
+// browse neighbours without degeneracy (almost the same as move_set) assume Deg.first = true
+hash_entry *browse_neighs(hash_entry &str, int &saddle_en)
 {
   // count how many times called
   cnt_move++;
 
   // unused, just for necessity of functions
-  short *min_pt = enc.pt;
+  short *min_pt = Enc.pt;
 
   // used
-  deg.current = energy;
+  Deg.current = str.energy;
 
   // did we just find escape from basin?
   bool escape = false;
 
-  //if (deg.opt->verbose_lvl>3) fprintf(stderr, "\n  browse neighs:\n  %s %d\n\n", pt_to_str(enc.pt).c_str(), energy);
+  //if (deg.opt->verbose_lvl>3) fprintf(stderr, "\n  browse neighs:\n  %s %d\n\n", pt_to_str(Enc.pt).c_str(), energy);
 
-  escape = insertions(enc, energy, min_pt, deg, deg.opt->verbose_lvl>3);
+  escape = insertions(energy, min_pt);
   //if (deg.opt->verbose_lvl>3) fprintf(stderr, "\n");
 
   // deletions
-  if (!escape) escape = deletions(enc, energy, min_pt, deg, deg.opt->verbose_lvl>3);
+  if (!escape) escape = deletions(energy, min_pt);
 
   // shifts (only if enabled + noLP disabled)
-  if (deg.opt->shift && !deg.opt->noLP) {
-    if (!escape) escape = shifts(enc, energy, min_pt, deg, deg.opt->verbose_lvl>3);
+  if (Opt.shift && !Opt.noLP) {
+    if (!escape) escape = shifts(energy, min_pt);
   }
 
-  if (escape) saddle_en = deg.current;
+  if (escape) saddle_en = Deg.current;
 
   return escape;
 }

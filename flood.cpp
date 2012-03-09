@@ -37,45 +37,35 @@ bool compare_vect (const hash_entry &lhs, const hash_entry &rhs){
 }
 
 // function to do on all the items...
-bool flood_func(short *struc, int energy)
+bool flood_func(hash_entry &input)
 {
-  //create hash entry
-  hash_entry *hee = (hash_entry*)space(sizeof(hash_entry));
-  hee->structure = struc;
-  hee->energy = energy;
-
   // have we seen him?
-  hash_entry *seen =  (hash_entry*)lookup_hash(hee);
+  hash_entry *seen =  (hash_entry*)lookup_hash(&input);
   if (seen != NULL) {
     // nothing to do with already processed structure
     if (debugg) fprintf(stderr, "       already seen: %s %.2f\n", pt_to_str(struc).c_str(), energy/100.0);
-    free(hee);
     return false;
   } else {
     // found escape? (its energy is lower than our energy lvl and we havent seen it)
-    if (hee->energy < energy_lvl) {
+    if (input->energy < energy_lvl) {
       // ends flood and return it as a structure to walk down
       if (debugg) fprintf(stderr, "       escape  : %s %.2f\n", pt_to_str(struc).c_str(), energy/100.0);
-      free(hee);
       return true;
     } else {
       if (debugg) fprintf(stderr, "       adding  : %s %.2f\n", pt_to_str(struc).c_str(), energy/100.0);
       // just add it to the queue... and to hash
-      hee->structure = allocopy(struc);
+      hash_entry *hee = copy_entry(input);
       neighs.push(hee);
-      //fprintf(stderr, "+neighs size: %d\n", (int)neighs.size());
-
-      // create hash_entry to write (hash stores pointers -> should be emptied)
-      write_hash(hee);
+      write_hash(hee); // create hash_entry to write (hash stores pointers -> should be emptied)
       return false;
     }
   }
 }
 
-hash_entry* flood(encoded &enc, int energy, options &opt, int &saddle_en)
+hash_entry* flood(hash_entry &he, int &saddle_en)
 {
   int count = 0;
-  debugg = opt.verbose_lvl>3;
+  debugg = Opt.verbose_lvl>3;
 
   // init priority queue
   while (!neighs.empty()) {
@@ -88,25 +78,21 @@ hash_entry* flood(encoded &enc, int energy, options &opt, int &saddle_en)
   initialize_hash();
 
   // add the first structure
-  hash_entry *he = (hash_entry*)space(sizeof(hash_entry));
-  he->energy = energy;
-  he->structure = allocopy(enc.pt);
-  neighs.push(he);
+  hash_entry *bottom = copy_entry(he);
+  neighs.push(bottom);
     // also to hash
-  write_hash(he);
+  write_hash(bottom);
 
   // save deg.first + create deg
-  bool first = opt.first;
-  opt.first = true;
-  opt.f_point = flood_func;
-  degen deg;
-  deg.opt = &opt;
+  bool first = Opt.first;
+  Opt.first = true;
+  Opt.f_point = flood_func;
 
   // returning hash_entry
-  hash_entry *ret = NULL;
+  hash_entry *escape = NULL;
 
   // FLOOOD!
-  while ((int)hash_size() < opt.floodMax) {
+  while ((int)hash_size() < Opt.floodMax) {
     // should not be empty
     if (neighs.empty()) break;
 
@@ -115,22 +101,14 @@ hash_entry* flood(encoded &enc, int energy, options &opt, int &saddle_en)
     neighs.pop();
     energy_lvl = he_tmp->energy;
 
-    // find all neighbours of struc and do a function flood_struc on every one of them
-    copy_arr(enc.pt, he_tmp->structure);
-    energy = he_tmp->energy;
+    if (Opt.verbose_lvl>2) fprintf(stderr, "  neighbours of: %s %.2f\n", pt_to_str(Enc.pt).c_str(), he_tmp->energy/100.0);
 
-    if (opt.verbose_lvl>2) fprintf(stderr, "  neighbours of: %s %.2f\n", pt_to_str(enc.pt).c_str(), he_tmp->energy/100.0);
+    escape = browse_neighs(*he_tmp, saddle_en);
 
-    bool escape = browse_neighs(enc, energy, deg, saddle_en);
-
-    if (opt.verbose_lvl>2) fprintf(stderr, "sad= %6.2f (%c): %s %.2f\n", saddle_en/100.0, (escape?'t':'f'), pt_to_str(enc.pt).c_str(), energy/100.0);
+    if (Opt.verbose_lvl>2) fprintf(stderr, "sad= %6.2f (%c): %s %.2f\n", saddle_en/100.0, (escape?'t':'f'), pt_to_str(Enc.pt).c_str(), Enc.energy/100.0);
 
     // did we find exit from basin?
     if (escape) {
-      //if (opt.verbose_lvl>2) fprintf(stderr, "found escape!!\n");
-      ret = (hash_entry*) space(sizeof(hash_entry));
-      ret->energy = energy;
-      ret->structure = allocopy(enc.pt);
       break;
     }
 
@@ -138,8 +116,8 @@ hash_entry* flood(encoded &enc, int energy, options &opt, int &saddle_en)
   }
 
   // restore deg options
-  opt.first = first;
-  opt.f_point = NULL;
+  Opt.first = first;
+  Opt.f_point = NULL;
 
   // destroy queue
   while (!neighs.empty()) {
@@ -149,7 +127,7 @@ hash_entry* flood(encoded &enc, int energy, options &opt, int &saddle_en)
   // destroy hash
   kill_hash();
 
-  return ret;
+  return escape;
 }
 
 

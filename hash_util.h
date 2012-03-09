@@ -21,6 +21,9 @@ typedef struct _hash_entry {
   int count; // for counting in descend (not used in flooding)
 } hash_entry;
 
+
+hash_entry *copy_entry(hash_entry &he);
+void free_entry(hash_entry *he);
 #endif
 
 /* End of file */

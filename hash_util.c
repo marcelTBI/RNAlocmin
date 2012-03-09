@@ -45,6 +45,22 @@ PUBLIC unsigned int hash_size()
   return hash_count;
 }
 
+hash_entry *copy_entry(hash_entry *he)
+{
+  hash_entry *he_n = (hash_entry*) space(sizeof(hash_entry));
+  he_n->structure = allocopy(he.structure);
+  he_n->energy = he.energy;
+  he_n->count = he.count;
+
+  return he_n;
+}
+
+void free_entry(hash_entry *he)
+{
+  if (he->structure) free(he->structure);
+  free(he);
+}
+
 PUBLIC int hash_comp(void *x, void *y)
 {
   short *lhs = ((hash_entry *)y)->structure;

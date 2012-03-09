@@ -47,6 +47,6 @@ struct compare_queue {
 bool compare_vect (const hash_entry &lhs, const hash_entry &rhs);
 
 // flood the structure - return one below saddle structure (should be freed then) energy of saddle is in "saddle_en"
-hash_entry* flood(encoded &enc, int energy, options &opt, int &saddle_en);
+hash_entry* flood(const hash_entry &str, int &saddle_en);
 
 #endif

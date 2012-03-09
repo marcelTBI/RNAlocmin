@@ -14,6 +14,7 @@ OBJ = RNAlocmin_cmdline.o\
 			main.o\
 			move_set.o\
 			treeplot.o\
+			globals.o
 
 DIRS = -I $(ViennaRNA)
 

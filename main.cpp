@@ -18,6 +18,7 @@ extern "C" {
   #include "hash_util.h"
 }
 
+#include "globals.h"
 #include "move_set.h"
 #include "flood.h"
 
@@ -25,77 +26,10 @@ extern "C" {
 
 using namespace std;
 
-// are arguments bad?
-int bad_arguments(gengetopt_args_info &args_info)
-{
-/*option "move"               m "Move set:\nI ==> insertion & deletion of base pair\nS ==> I&D& switch base pair" values="I","S" default="I" no
-option "min-num"            n "Maximal number of local minima returned" int default="100" no
-option "find-num"           - "Maximal number of local minima found \n  (default = unlimited - crawl through whole file)" int no
-option "seq"                s "Sequence file in FASTA format" string default="seq.txt"
-option "verbose-lvl"        v "Level of verbosity (0 = nothing, 3 = full)" int default="0" no
-option "rates"              r "Create rates for treekin" flag off
-option "rates-file"         f "File where to write rates" string default="rates.out" no
-option "temp"               T "Temperature in Celsius (only for rates)" double default="37.0" no
-option "depth"              d "Depth of findpath search (higher values increase running time)" int default="10" no
-option "minh"               - "Print only minima with energy barrier greater than this" double default="0.0" no
-option "noLP"               - "Work with canonical RNA structures (w/o isolated base pairs)" flag off
-option "bartree"            b "Generate possible barrier tree" flag off
-option "useEOS"             e "Use energy_of_structure_pt calculation instead of energy_of_move (slower, it should not affect results)" flag off
-option "useFirst"           - "Use first found lower energy structure instead of deepest" flag off
-option "floodPortion"       - "Fraction of minima to flood\n(0.0 -> no flood; 1.0 -> try to flood all of them)" double default="0.95" no
-option "floodMax"           - "Flood cap - how many structures to flood in one basin" int default="1000" no
-*/
-
-  int ret = 0;
-
-  if (args_info.min_num_arg<=0) {
-    fprintf(stderr, "Number of local minima should be positive integer (min-num)\\n");
-    ret = -1;
-  }
-
-  if (args_info.find_num_given && args_info.find_num_arg<=0) {
-    fprintf(stderr, "Number of local minima should be positive integer (find-num)\n");
-    ret = -1;
-  }
-
-  if (args_info.verbose_lvl_arg<0 || args_info.verbose_lvl_arg>4) {
-    if (args_info.verbose_lvl_arg<0) args_info.verbose_lvl_arg = 0;
-    else args_info.verbose_lvl_arg = 4;
-    fprintf(stderr, "WARNING: level of verbosity is not in range (0-4), setting it to %d\n", args_info.verbose_lvl_arg);
-  }
-
-  if (args_info.temp_arg<-273.15) {
-    fprintf(stderr, "Temperature cannot be below absolute zero\n");
-    ret = -1;
-  }
-
-  if (args_info.floodMax_arg<0) {
-    fprintf(stderr, "Flood cap must be non-negative\n");
-    ret = -1;
-  }
-
-  if (args_info.floodPortion_arg<0.0 || args_info.floodPortion_arg>1.0) {
-    args_info.floodPortion_arg = (args_info.floodPortion_arg<0.0 ? 0.0 : 1.0);
-    fprintf(stderr, "WARNING: floodPortion is not in range (0.0-1.0), setting it to %.1f\n", args_info.floodPortion_arg);
-  }
-
-  if (args_info.depth_arg<=0) {
-    fprintf(stderr, "Depth of findpath search should be positive integer\n");
-    ret = -1;
-  }
-
-  if (args_info.minh_arg<0.0) {
-    fprintf(stderr, "Depth of findpath search should be non-negative number\n");
-    ret = -1;
-  }
-
-  return ret;
-}
-
 static int num_moves = 0;
 static int seq_len;
 
-int move(encoded &enc, char *seq, map<hash_entry, int, compare_map> &output, options &opt)
+int move(map<hash_entry, int, compare_map> &output)
 {
   // count moves
   num_moves++;
@@ -118,60 +52,55 @@ int move(encoded &enc, char *seq, map<hash_entry, int, compare_map> &output, opt
   }
 
   // convert to pt
-  encode_str(&enc, structure);
+  Enc.Struct(structure);
   free(structure);
 
   // was it before?
   hash_entry *hee = (hash_entry*)space(sizeof(hash_entry));
-  hee->structure = enc.pt;
+  hee->structure = get_enc()->pt;
   hash_entry *tmp_h = (hash_entry*)lookup_hash(hee);
   if (tmp_h) {
     free(hee);
     tmp_h->count++;
     return 0;
   } else {
-    hee->structure = allocopy(enc.pt);
+    hee->structure = allocopy(get_enc()->pt);
     hee->count = 1;
     write_hash(hee);
   }
 
   //is it canonical (noLP)
-  if (opt.noLP && find_lone_pair(enc.pt)!=-1) {
-    fprintf(stderr, "WARNING: structure \"%s\" has lone pairs, skipping...\n", pt_to_str(enc.pt).c_str());
+  if (opt.noLP && find_lone_pair(get_enc()->pt)!=-1) {
+    fprintf(stderr, "WARNING: structure \"%s\" has lone pairs, skipping...\n", pt_to_str(Enc.pt).c_str());
     return -2;
   }
 
   //debugging
-  if (opt.verbose_lvl>2) fprintf(stderr, "processing: %d %s\n", num_moves, pt_to_str(enc.pt).c_str());
+  if (opt.verbose_lvl>2) fprintf(stderr, "processing: %d %s\n", num_moves, pt_to_str(Enc.pt).c_str());
 
-  // find energy and set options
-  degen deg;
-  deg.opt = &opt;
-
-  int energy = energy_of_structure_pt(seq, enc.pt, enc.s0, enc.s1, 0);
+  //find energy
+  int energy = get_enc()->Energy();
   hee->energy = energy;
 
   // deepest descend
-  while (move_set(enc, energy, deg)!=0) {
-    erase_set(deg.unprocessed);
-    erase_set(deg.processed);
+  while (move_set(energy)!=0) {
+    Deg.Clear();
   }
-  erase_set(deg.unprocessed);
-  erase_set(deg.processed);
+  Deg.Clear();
 
-  if (opt.verbose_lvl>2) fprintf(stderr, "\n  %s %d\n", pt_to_str(enc.pt).c_str(), energy);
+  if (opt.verbose_lvl>2) fprintf(stderr, "\n  %s %d\n", pt_to_str(Enc.pt).c_str(), energy);
 
   // save for output
   //string stro = pt_to_str(enc.pt);
   map<hash_entry, int, compare_map>::iterator it;
   hash_entry he;
-  he.structure = enc.pt;
+  he.structure = Enc.pt;
   he.energy = energy;
   he.count = 0;
   if ((it = output.find(he)) != output.end()) {
     it->second++;
   } else {
-    he.structure = allocopy(enc.pt);
+    he.structure = allocopy(Enc.pt);
     output.insert(make_pair(he, 1));
   }
 
@@ -190,21 +119,10 @@ int main(int argc, char **argv)
   }
 
   //check for bad arguments
-  if (bad_arguments(args_info) !=0 ) {
+  if (Opt.Init(args_info) !=0 ) {
     fprintf(stderr, "ERROR: one or more bad arguments, exiting...\n");
     exit(EXIT_FAILURE);
   }
-
-  // adjust options
-  options opt;
-  opt.minh = args_info.minh_arg;
-  opt.noLP = args_info.noLP_flag;
-  opt.EOM = !args_info.useEOS_flag;
-  opt.first = args_info.useFirst_flag;
-  opt.f_point = NULL;
-  opt.shift = args_info.move_arg[0]=='S';
-  opt.verbose_lvl = args_info.verbose_lvl_arg;
-  opt.floodMax = args_info.floodMax_arg;
 
   // read sequence
   FILE *fseq;
@@ -244,10 +162,9 @@ int main(int argc, char **argv)
 
   // ########################## main loop - reads structures from RNAsubopt and process them
   int count = 0;  //num of local minima
-  encoded *enc=NULL;
-  enc = encode_seq(seq);
+  Enc.Init(seq);
   while (!args_info.find_num_given || count != args_info.find_num_arg) {
-    int res = move(*enc, seq, output, opt);
+    int res = move(output);
     if (res==0)   continue;
     if (res==-1)  break;
     if (res==-2)  not_canonical++;
@@ -328,11 +245,11 @@ int main(int argc, char **argv)
     for (int i=num-1; i>=0; i--) {
       // flood only if low number of walks ended there
       if (output_num[i]<=threshold) {
-        copy_arr(enc->pt, output_he[i].structure);
+        copy_arr(Enc.pt, output_he[i].structure);
         if (args_info.verbose_lvl_arg>2) fprintf(stderr,   "flooding  (%3d): %s %.2f\n", i, output_str[i].c_str(), output_he[i].energy/100.0);
 
         int saddle;
-        hash_entry *he = flood(*enc, output_he[i].energy, opt, saddle);
+        hash_entry *he = flood(Enc, output_he[i].energy, opt, saddle);
 
         // print info
         if (args_info.verbose_lvl_arg>1) {
@@ -352,21 +269,19 @@ int main(int argc, char **argv)
           // setup move_set
           degen deg;
           deg.opt = &opt;
-          copy_arr(enc->pt, he->structure);
+          copy_arr(Enc.pt, he->structure);
           int en = he->energy;
           free(he->structure);
           free(he);
           // walk down
-          while (move_set(*enc, en, deg)!=0) {
-            erase_set(deg.processed);
-            erase_set(deg.unprocessed);
+          while (move_set(en)!=0) {
+            Deg.Clear();
           };
-          erase_set(deg.processed);
-          erase_set(deg.unprocessed);
+          Deg.Clear();
 
           // now check if we have the minimum already (hopefuly yes ;-) )
           hash_entry he_tmp;
-          he_tmp.structure = enc->pt;
+          he_tmp.structure = Enc.pt;
           he_tmp.energy = en;
           vector<hash_entry>::iterator it;
           it = lower_bound(output_he.begin(), output_he.end(), he_tmp, compare_vect);
@@ -500,71 +415,10 @@ int main(int argc, char **argv)
     } else printf("\n");
   }
 
-/*
-  // print structures + count (sorted)
-  if (args_info.verbose_lvl_arg>0) {
-    vector<pair<int, string> > out;
-    for (map<string, int>::iterator it=structures.begin(); it!=structures.end();it++) {
-      out.push_back(make_pair(it->second, it->first));
-      //fprintf(stderr, "%s %d\n", it->first.c_str(), it->second);
-    }
-    if (args_info.noLP_flag) {
-      fprintf(stderr, "move_set called %d times on %d canonical structures (%d total structures).\n", count_move(), (int)out.size()-not_canonical, (int)out.size());
-    } else {
-      fprintf(stderr, "move_set called %d times on %d structures.\n", count_move(), (int)out.size());
-    }
-    if (args_info.verbose_lvl_arg>2) {
-      sort(out.begin(), out.end());
-      for(int i=out.size()-1; i>=0; i--) {
-        fprintf(stderr, "%s %d\n", out[i].second.c_str(), out[i].first);
-      }
-      fprintf(stderr, "\n");
-    }
-  }
-*/
-/*  // print mean energy + entropy of generation
-  if (args_info.verbose_lvl_arg>0) {
-    double ME = 0.0;
-    double Z = 0.0;
-    double E = 0.0;
-
-    double meanE = 0.0;
-    double entropy = 0.0;
-
-    int all = 0;
-    double _kT = 0.00198717*(273.15 + args_info.temp_arg);
-
-    for (map<string, int>::iterator it=structures.begin(); it!=structures.end(); it++) {
-      float energy = energy_of_structure(seq, it->first.c_str(), 0);
-      all += it->second;
-      Z += exp(-energy/_kT);
-    }
-    for (map<string, int>::iterator it=structures.begin(); it!=structures.end(); it++) {
-      float energy = energy_of_structure(seq, it->first.c_str(), 0);
-      double expe = exp(-energy/_kT);
-
-      meanE += energy*(it->second);
-      entropy -= it->second/(double)all*(log(it->second/(double) all));
-
-      ME += energy*expe;
-
-
-      E += expe/Z*log(exp(energy/_kT)/Z);
-    }
-
-    meanE /= (double)all;
-    ME /= Z;
-
-    fprintf(stderr, "mean energy : %lf\n", meanE);
-    fprintf(stderr, "entropy     : %lf\n", entropy);
-    fprintf(stderr, "minima found: %d\n", count);
-  }*/
-
   // release resources
   if (energy_barr!=NULL) free(energy_barr);
   if (seq!=NULL) free(seq);
   if (name!=NULL) free(name);
-  if (enc) free_encode(enc);
   cmdline_parser_free(&args_info);
   for(unsigned int i=0; i<output_he.size(); i++) {
     free(output_he[i].structure);
