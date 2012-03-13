@@ -4,6 +4,7 @@ ViennaLIB=~/software/lib/libRNA.a
 
 CPP = g++
 CC = gcc
+CPPFLAGS =  -O2 -g -Wall -std=c++0x -fexceptions -Wno-write-strings
 CFLAGS =  -O2 -g -Wall -fexceptions -Wno-write-strings
 LFLAGS = -O2 -fopenmp
 
@@ -28,7 +29,7 @@ RNAlocmin_cmdline.h RNAlocmin_cmdline.c: RNAlocmin.ggo
 	gengetopt -i RNAlocmin.ggo
 
 %.o: %.cpp
-	$(CPP) $(CFLAGS) $(DIRS) -c $<
+	$(CPP) $(CPPFLAGS) $(DIRS) -c $<
 
 %.o: %.c
 	$(CC) $(CFLAGS) $(DIRS) -c $<

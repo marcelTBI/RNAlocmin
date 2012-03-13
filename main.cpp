@@ -10,6 +10,8 @@
 #include <vector>
 #include <algorithm>
 
+//#include <unordered_map>
+
 extern "C" {
   #include "fold.h"
   #include "findpath.h"
@@ -80,7 +82,8 @@ int move(map<hash_entry, int, compare_map> &output)
   str->energy = Enc.Energy(*str);
 
   // deepest descend
-  while (move_set(*str)!=0) {
+  int i;
+  while ((i = move_set(*str))!=0) {
     Deg.Clear();
   }
   Deg.Clear();
@@ -179,7 +182,7 @@ int main(int argc, char **argv)
   }
 
   // vectors for rates computation
-  int num = (count > args_info.min_num_arg ? args_info.min_num_arg : count);
+  int num = ((count > args_info.min_num_arg && args_info.min_num_arg!=0) ? args_info.min_num_arg : count);
   vector<string> output_str;
   output_str.resize(num);
   vector<hash_entry> output_he;
@@ -402,6 +405,57 @@ int main(int argc, char **argv)
       printf(" %4d %6.2f\n", nodes[i].father+1, nodes[i].saddle_height-nodes[i].height);
     } else printf("\n");
   }
+
+  // Jing's visualisation
+  if (args_info.numIntervals_arg>0) {
+    // whole range of our minima
+    int range = output_en[num-1] - output_en[0];
+    float dE = range/(float)args_info.numIntervals_arg;
+
+    int max_samples = 0;
+    for (int i=0; i<num; i++) {
+      if (output_num[i]>max_samples) max_samples = output_num[i];
+    }
+
+    // function f(i,j)
+    int visual[args_info.numIntervals_arg][max_samples];
+    for (int i=0; i<max_samples; i++) {
+      for (int j=0; j<args_info.numIntervals_arg; j++) {
+        visual[j][i]=0;
+      }
+    }
+    // fill the array
+    int curr_en = 0;
+    for (int i=0; i<num; i++) {
+      float curr_range = (float)(output_en[i]-output_en[0]);
+      while (curr_range>(curr_en+1)*dE) curr_en++;
+      visual[curr_en][output_num[i]-1]++;
+    }
+
+    FILE *file;
+    char filename[] = "visuals.txt";
+    file = fopen(filename, "w");
+    if (file == NULL) {
+      fprintf(stderr, "Cannot open file \"%s\"\n", filename);
+    } else {
+
+      // header
+      fprintf(file, " #samp " );
+      for (int j=0; j<args_info.numIntervals_arg; j++) fprintf(file, "%6.1f", (output_en[0]+(j+1)*dE)/100.0);
+      fprintf(file, "\n\n");
+
+      // data
+      for (int i=0; i<max_samples; i++) {
+        fprintf(file, "%6d", i+1);
+        for (int j=0; j<args_info.numIntervals_arg; j++) {
+          fprintf(file, "%6d", visual[j][i]);
+        }
+        fprintf(file, "\n");
+      }
+      fclose(file);
+    }
+  }
+
 
   // release resources
   if (energy_barr!=NULL) free(energy_barr);

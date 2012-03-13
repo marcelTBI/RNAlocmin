@@ -107,7 +107,7 @@ int update_deepest(hash_entry &str, hash_entry &min)
   }
 
   // degeneracy
-  if ((abs(min.energy - str.energy) <= 0) && (abs(min.energy - str.energy) <= 0)) {
+  if ((str.energy == min.energy) && (Deg.current == min.energy)) {
     if (Deg.processed.count(str.structure)==0 && Deg.unprocessed.count(str.structure)==0) {
       Deg.unprocessed.insert(allocopy(str.structure));
     }
@@ -378,7 +378,7 @@ int move_set(hash_entry &str)
 
   // if degeneracy occurs, solve it!
   if (!end && Deg.unprocessed.size()>0) {
-    Deg.current = str.energy;  // should be true nevertheless
+    if(Deg.current!=str.energy) throw;
     Deg.processed.insert(allocopy(str.structure));
     // take first to structure
     if (str.structure) free(str.structure);
@@ -397,7 +397,7 @@ int move_set(hash_entry &str)
   if (Deg.processed.size()>0) {
     Deg.processed.insert(str.structure);
     str.structure = *Deg.processed.begin();
-    str.energy = Deg.current; // should be true nevertheless
+    if(Deg.current!=str.energy) throw;
     Deg.processed.erase(Deg.processed.begin());
 
     if (!Deg.unprocessed.empty()) fprintf(stderr, "WARNING: Deg.unprocessed not empty!!!\n");

@@ -13,6 +13,7 @@ extern void kill_hash();
 extern void initialize_hash();
 extern unsigned int hash_size();
 
+
 // print stats about current hash
 extern void print_stats();
 

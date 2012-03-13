@@ -128,28 +128,10 @@ Options::Options()
 
 int Options::Init(gengetopt_args_info &args_info)
 {
-/*option "move"               m "Move set:\nI ==> insertion & deletion of base pair\nS ==> I&D& switch base pair" values="I","S" default="I" no
-option "min-num"            n "Maximal number of local minima returned" int default="100" no
-option "find-num"           - "Maximal number of local minima found \n  (default = unlimited - crawl through whole file)" int no
-option "seq"                s "Sequence file in FASTA format" string default="seq.txt"
-option "verbose-lvl"        v "Level of verbosity (0 = nothing, 3 = full)" int default="0" no
-option "rates"              r "Create rates for treekin" flag off
-option "rates-file"         f "File where to write rates" string default="rates.out" no
-option "temp"               T "Temperature in Celsius (only for rates)" double default="37.0" no
-option "depth"              d "Depth of findpath search (higher values increase running time)" int default="10" no
-option "minh"               - "Print only minima with energy barrier greater than this" double default="0.0" no
-option "noLP"               - "Work with canonical RNA structures (w/o isolated base pairs)" flag off
-option "bartree"            b "Generate possible barrier tree" flag off
-option "useEOS"             e "Use energy_of_structure_pt calculation instead of energy_of_move (slower, it should not affect results)" flag off
-option "useFirst"           - "Use first found lower energy structure instead of deepest" flag off
-option "floodPortion"       - "Fraction of minima to flood\n(0.0 -> no flood; 1.0 -> try to flood all of them)" double default="0.95" no
-option "floodMax"           - "Flood cap - how many structures to flood in one basin" int default="1000" no
-*/
-
   int ret = 0;
 
-  if (args_info.min_num_arg<=0) {
-    fprintf(stderr, "Number of local minima should be positive integer (min-num)\\n");
+  if (args_info.min_num_arg<0) {
+    fprintf(stderr, "Number of local minima should be non-negative integer (min-num)\\n");
     ret = -1;
   }
 
@@ -186,6 +168,11 @@ option "floodMax"           - "Flood cap - how many structures to flood in one b
 
   if (args_info.minh_arg<0.0) {
     fprintf(stderr, "Depth of findpath search should be non-negative number\n");
+    ret = -1;
+  }
+
+  if (args_info.numIntervals_arg<0) {
+    fprintf(stderr, "Number of intervals should be non-negative number\n");
     ret = -1;
   }
 
