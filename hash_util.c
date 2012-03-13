@@ -45,12 +45,28 @@ PUBLIC unsigned int hash_size()
   return hash_count;
 }
 
-hash_entry *copy_entry(hash_entry *he)
+void copy_arr(short *dest, short *src)
+{
+  if (!src || !dest) {
+    fprintf(stderr, "Empty pointer in copying\n");
+    return;
+  }
+  memcpy(dest, src, sizeof(short)*(src[0]+1));
+}
+
+short *allocopy(short *src)
+{
+  short *res = (short*) space(sizeof(short)*(src[0]+1));
+  copy_arr(res, src);
+  return res;
+}
+
+hash_entry *copy_entry(const hash_entry *he)
 {
   hash_entry *he_n = (hash_entry*) space(sizeof(hash_entry));
-  he_n->structure = allocopy(he.structure);
-  he_n->energy = he.energy;
-  he_n->count = he.count;
+  he_n->structure = allocopy(he->structure);
+  he_n->energy = he->energy;
+  he_n->count = he->count;
 
   return he_n;
 }

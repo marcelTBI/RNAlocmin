@@ -43,18 +43,18 @@ bool flood_func(hash_entry &input)
   hash_entry *seen =  (hash_entry*)lookup_hash(&input);
   if (seen != NULL) {
     // nothing to do with already processed structure
-    if (debugg) fprintf(stderr, "       already seen: %s %.2f\n", pt_to_str(struc).c_str(), energy/100.0);
+    if (debugg) fprintf(stderr, "       already seen: %s %.2f\n", pt_to_str(input.structure).c_str(), input.energy/100.0);
     return false;
   } else {
     // found escape? (its energy is lower than our energy lvl and we havent seen it)
-    if (input->energy < energy_lvl) {
+    if (input.energy < energy_lvl) {
       // ends flood and return it as a structure to walk down
-      if (debugg) fprintf(stderr, "       escape  : %s %.2f\n", pt_to_str(struc).c_str(), energy/100.0);
+      if (debugg) fprintf(stderr, "       escape  : %s %.2f\n", pt_to_str(input.structure).c_str(), input.energy/100.0);
       return true;
     } else {
-      if (debugg) fprintf(stderr, "       adding  : %s %.2f\n", pt_to_str(struc).c_str(), energy/100.0);
+      if (debugg) fprintf(stderr, "       adding  : %s %.2f\n", pt_to_str(input.structure).c_str(), input.energy/100.0);
       // just add it to the queue... and to hash
-      hash_entry *hee = copy_entry(input);
+      hash_entry *hee = copy_entry(&input);
       neighs.push(hee);
       write_hash(hee); // create hash_entry to write (hash stores pointers -> should be emptied)
       return false;
@@ -62,7 +62,7 @@ bool flood_func(hash_entry &input)
   }
 }
 
-hash_entry* flood(hash_entry &he, int &saddle_en)
+hash_entry* flood(const hash_entry &he, int &saddle_en)
 {
   int count = 0;
   debugg = Opt.verbose_lvl>3;
@@ -78,7 +78,7 @@ hash_entry* flood(hash_entry &he, int &saddle_en)
   initialize_hash();
 
   // add the first structure
-  hash_entry *bottom = copy_entry(he);
+  hash_entry *bottom = copy_entry(&he);
   neighs.push(bottom);
     // also to hash
   write_hash(bottom);
@@ -101,11 +101,11 @@ hash_entry* flood(hash_entry &he, int &saddle_en)
     neighs.pop();
     energy_lvl = he_tmp->energy;
 
-    if (Opt.verbose_lvl>2) fprintf(stderr, "  neighbours of: %s %.2f\n", pt_to_str(Enc.pt).c_str(), he_tmp->energy/100.0);
+    if (Opt.verbose_lvl>2) fprintf(stderr, "  neighbours of: %s %.2f\n", pt_to_str(he_tmp->structure).c_str(), he_tmp->energy/100.0);
 
     escape = browse_neighs(*he_tmp, saddle_en);
 
-    if (Opt.verbose_lvl>2) fprintf(stderr, "sad= %6.2f (%c): %s %.2f\n", saddle_en/100.0, (escape?'t':'f'), pt_to_str(Enc.pt).c_str(), Enc.energy/100.0);
+    if (Opt.verbose_lvl>2) fprintf(stderr, "sad= %6.2f (%c): %s %.2f\n", saddle_en/100.0, (escape?'t':'f'), pt_to_str(escape->structure).c_str(), escape->energy/100.0);
 
     // did we find exit from basin?
     if (escape) {

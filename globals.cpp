@@ -11,23 +11,10 @@ extern "C" {
 
 #include "globals.h"
 
-// get global degen structure
-static Degen *get_degen()
-{
-  return &Deg;
-}
-
-// get global options
-static Options *get_opt()
-{
-  return &Opt;
-}
-
-// get current encoded
-static Encoded *get_enc()
-{
-  return &Enc;
-}
+// some singleton objects
+Degen Deg;
+Options Opt;
+Encoded Enc;
 
 // create encoded structure
 Encoded::Encoded()
@@ -53,39 +40,39 @@ Encoded::~Encoded()
 void Encoded::Init(const char *seq)
 {
   if (this->seq) free(this->seq);
-  this->seq = (char*) space(strlen(seq)*sizeof(char));
+  this->seq = (char*) space((strlen(seq)+1)*sizeof(char));
   strcpy(this->seq, seq);
 
   s0   = encode_sequence(seq, 0);
   s1   = encode_sequence(seq, 1);
 }
 
-void Encoded::Struct(const char *str)
+short *Encoded::Struct(const char *str)
 {
-  if (pt) free(pt);
-  pt = make_pair_table(str);
+  return make_pair_table(str);
 }
 
 int Encoded::Energy(hash_entry &he)
 {
-  return energy_of_structure_pt(seq, he.pt, s0, s1, 0);
+  return energy_of_structure_pt(seq, he.structure, s0, s1, 0);
 }
 
 int Encoded::EnergyOfMove(hash_entry &he)
 {
   int tmp_en;
   if (Opt.EOM) {
-    tmp_en = he.energy + energy_of_move_pt(he.pt, s0, s1, bp_left, bp_right);
+    tmp_en = he.energy + energy_of_move_pt(he.structure, s0, s1, bp_left, bp_right);
     Move(he, true, false);
     if (bp_left2 != 0) {
-      tmp_en += energy_of_move_pt(he.pt, s0, s1, bp_left2, bp_right2);
+      tmp_en += energy_of_move_pt(he.structure, s0, s1, bp_left2, bp_right2);
       Move(he, false, true);
     }
   } else {
     Move(he);
-    tmp_en = energy_of_structure_pt(seq, he.pt, s0, s1, 0);
+    tmp_en = energy_of_structure_pt(seq, he.structure, s0, s1, 0);
   }
-
+  last_en = he.energy;
+  he.energy = tmp_en;
   return tmp_en;
 }
 
@@ -102,24 +89,27 @@ inline void do_move(short *pt, int bp_left, int bp_right)
   }
 }
 
-inline void Encoded::Move(hash_entry &he, bool first = true, bool second = true)
+inline void Encoded::Move(hash_entry &he, bool first, bool second)
 {
   if (first && bp_left != 0) {
-    do_move(he.pt, bp_left, bp_right);
+    do_move(he.structure, bp_left, bp_right);
   }
   if (second && bp_left2 != 0) {
-    do_move(he.pt, bp_left2, bp_right2);
+    do_move(he.structure, bp_left2, bp_right2);
   }
 }
 
-void Encoded::UndoMove(hash_entry &he, bool first = true, bool second = true)
+void Encoded::UndoMove(hash_entry &he, bool first, bool second)
 {
   if (second && bp_left2 != 0) {
-    do_move(he.pt, -bp_left2, -bp_right2);
+    do_move(he.structure, -bp_left2, -bp_right2);
   }
   if (first && bp_left != 0) {
-    do_move(he.pt, -bp_left, -bp_right);
+    do_move(he.structure, -bp_left, -bp_right);
   }
+
+  he.energy = last_en;
+  last_en = 1e5;
 
   Forget();
 }
@@ -237,20 +227,4 @@ void Degen::Clear()
     if (*it) free(*it);
   }
   processed.clear();
-}
-
-void copy_arr(short *dest, short *src)
-{
-  if (!src || !dest) {
-    fprintf(stderr, "Empty pointer in copying\n");
-    return;
-  }
-  memcpy(dest, src, sizeof(short)*(src[0]+1));
-}
-
-short *allocopy(short *src)
-{
-  short *res = (short*) space(sizeof(short)*(src[0]+1));
-  copy_arr(res, src);
-  return res;
 }

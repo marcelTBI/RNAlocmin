@@ -46,61 +46,57 @@ int move(map<hash_entry, int, compare_map> &output)
   while (structure[len]!='\0' && structure[len]!=' ') len++;
 
   if (len!=seq_len) {
-    fprintf(stderr, "Unequal lengths:\n(structure) %s\n (sequence) %s\n", structure, seq);
+    fprintf(stderr, "Unequal lengths:\n(structure) %s\n (sequence) %s\n", structure, Enc.seq);
     free(structure);
     return -1;
   }
 
-  // convert to pt
-  Enc.Struct(structure);
-  free(structure);
-
   // was it before?
-  hash_entry *hee = (hash_entry*)space(sizeof(hash_entry));
-  hee->structure = get_enc()->pt;
-  hash_entry *tmp_h = (hash_entry*)lookup_hash(hee);
+  hash_entry *str = (hash_entry*)space(sizeof(hash_entry));
+  str->structure = Enc.Struct(structure);
+  free(structure);
+  hash_entry *tmp_h = (hash_entry*)lookup_hash(str);
+  // if it was - release memory + get another
   if (tmp_h) {
-    free(hee);
+    free(str->structure);
+    free(str);
     tmp_h->count++;
     return 0;
   } else {
-    hee->structure = allocopy(get_enc()->pt);
-    hee->count = 1;
-    write_hash(hee);
+    str->count = 1;
+    write_hash(str);
   }
 
   //is it canonical (noLP)
-  if (opt.noLP && find_lone_pair(get_enc()->pt)!=-1) {
-    fprintf(stderr, "WARNING: structure \"%s\" has lone pairs, skipping...\n", pt_to_str(Enc.pt).c_str());
+  if (Opt.noLP && find_lone_pair(str->structure)!=-1) {
+    fprintf(stderr, "WARNING: structure \"%s\" has lone pairs, skipping...\n", pt_to_str(str->structure).c_str());
     return -2;
   }
 
   //debugging
-  if (opt.verbose_lvl>2) fprintf(stderr, "processing: %d %s\n", num_moves, pt_to_str(Enc.pt).c_str());
+  if (Opt.verbose_lvl>2) fprintf(stderr, "processing: %d %s\n", num_moves, pt_to_str(str->structure).c_str());
 
   //find energy
-  int energy = get_enc()->Energy();
-  hee->energy = energy;
+  str->energy = Enc.Energy(*str);
 
   // deepest descend
-  while (move_set(energy)!=0) {
+  while (move_set(*str)!=0) {
     Deg.Clear();
   }
   Deg.Clear();
 
-  if (opt.verbose_lvl>2) fprintf(stderr, "\n  %s %d\n", pt_to_str(Enc.pt).c_str(), energy);
+  if (Opt.verbose_lvl>2) fprintf(stderr, "\n  %s %d\n", pt_to_str(str->structure).c_str(), str->energy);
 
   // save for output
-  //string stro = pt_to_str(enc.pt);
   map<hash_entry, int, compare_map>::iterator it;
   hash_entry he;
-  he.structure = Enc.pt;
-  he.energy = energy;
-  he.count = 0;
+  he.structure = str->structure;
+  he.energy = str->energy;
+  he.count = 1;
   if ((it = output.find(he)) != output.end()) {
     it->second++;
   } else {
-    he.structure = allocopy(Enc.pt);
+    he.structure = allocopy(str->structure);
     output.insert(make_pair(he, 1));
   }
 
@@ -245,11 +241,11 @@ int main(int argc, char **argv)
     for (int i=num-1; i>=0; i--) {
       // flood only if low number of walks ended there
       if (output_num[i]<=threshold) {
-        copy_arr(Enc.pt, output_he[i].structure);
+        //copy_arr(Enc.pt, output_he[i].structure);
         if (args_info.verbose_lvl_arg>2) fprintf(stderr,   "flooding  (%3d): %s %.2f\n", i, output_str[i].c_str(), output_he[i].energy/100.0);
 
         int saddle;
-        hash_entry *he = flood(Enc, output_he[i].energy, opt, saddle);
+        hash_entry *he = flood(output_he[i], saddle);
 
         // print info
         if (args_info.verbose_lvl_arg>1) {
@@ -266,27 +262,19 @@ int main(int argc, char **argv)
 
         // if flood succesfull - walk down to find father minima
         if (he) {
-          // setup move_set
-          degen deg;
-          deg.opt = &opt;
-          copy_arr(Enc.pt, he->structure);
-          int en = he->energy;
-          free(he->structure);
-          free(he);
           // walk down
-          while (move_set(en)!=0) {
+          while (move_set(*he)!=0) {
             Deg.Clear();
           };
           Deg.Clear();
 
           // now check if we have the minimum already (hopefuly yes ;-) )
-          hash_entry he_tmp;
-          he_tmp.structure = Enc.pt;
-          he_tmp.energy = en;
           vector<hash_entry>::iterator it;
-          it = lower_bound(output_he.begin(), output_he.end(), he_tmp, compare_vect);
+          it = lower_bound(output_he.begin(), output_he.end(), *he, compare_vect);
 
-          if (args_info.verbose_lvl_arg>1) fprintf(stderr, "minimum: %s %.2f\n", pt_to_str(he_tmp.structure).c_str(), he_tmp.energy/100.0);
+          if (args_info.verbose_lvl_arg>1) fprintf(stderr, "minimum: %s %.2f\n", pt_to_str(he->structure).c_str(), he->energy/100.0);
+          // we dont need he again
+          free_entry(he);
 
           if (it!=output_he.end()) {
             int pos = (int)(it-output_he.begin());

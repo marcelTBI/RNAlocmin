@@ -6,7 +6,9 @@
 using namespace std;
 
 #include "RNAlocmin_cmdline.h"
-#include "hash_utils.h"
+extern "C" {
+  #include "hash_util.h"
+}
 
 // minimal gap for loop
 #define MINGAP 3
@@ -27,16 +29,19 @@ public:
   int   bp_left2;   // if noLP is enabled (and for shift moves)
   int   bp_right2;
 
+  // last energy
+  int last_en;
+
 public:
   Encoded();
   ~Encoded();
 
   void Init(const char* seq);
-  void Struct(const char *str);
+  short *Struct(const char *str);
 
   void Forget();
   inline void Move(hash_entry &he, bool first = true, bool second = true);
-  inline void UndoMove(hash_entry &he, bool first = true, bool second = true);
+  void UndoMove(hash_entry &he, bool first = true, bool second = true);
 
   // energy calculations on structures
   int Energy(hash_entry &he);
@@ -56,7 +61,7 @@ public:
   int floodMax; // cap for flooding
 
   // pointer to function used on every neighbour (in update deepest)
-  bool (*f_point) (short *, int);  // (I dont like it either, but it was easiest way to program it...:/ )
+  bool (*f_point) (hash_entry &);  // (I dont like it either, but it was easiest way to program it...:/ )
 
 public:
   Options();
@@ -111,13 +116,10 @@ static Options *get_opt();
 // get current encoded
 static Encoded *get_enc();
 */
-// copying of arrays
-short* allocopy(short *src);
-void copy_arr(short *desc, short *src);
 
 // some singleton objects
-static Degen Deg;
-static Options Opt;
-static Encoded Enc;
+extern Degen Deg;
+extern Options Opt;
+extern Encoded Enc;
 
 #endif
