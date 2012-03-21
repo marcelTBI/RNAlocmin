@@ -10,16 +10,14 @@
 #include <vector>
 #include <algorithm>
 
-//#include <unordered_map>
-
 extern "C" {
   #include "fold.h"
   #include "findpath.h"
   #include "RNAlocmin_cmdline.h"
   #include "utils.h"
-  #include "hash_util.h"
 }
 
+#include "hash_util.h"
 #include "globals.h"
 #include "move_set.h"
 #include "flood.h"
@@ -31,7 +29,7 @@ using namespace std;
 static int num_moves = 0;
 static int seq_len;
 
-int move(map<hash_entry, int, compare_map> &output)
+int move(unordered_map<hash_entry, int, hash_fncts> &structs, map<hash_entry, int, compare_map> &output, set<hash_entry, compare_map> &output_shallow)
 {
   // count moves
   num_moves++;
@@ -54,53 +52,78 @@ int move(map<hash_entry, int, compare_map> &output)
   }
 
   // was it before?
-  hash_entry *str = (hash_entry*)space(sizeof(hash_entry));
-  str->structure = Enc.Struct(structure);
+  hash_entry str;
+  str.structure = Enc.Struct(structure);
   free(structure);
-  hash_entry *tmp_h = (hash_entry*)lookup_hash(str);
+  unordered_map<hash_entry, int, hash_fncts>::iterator it_s = structs.find(str);
+  //hash_entry *tmp_h = (hash_entry*)lookup_hash(str);
   // if it was - release memory + get another
-  if (tmp_h) {
-    free(str->structure);
-    free(str);
-    tmp_h->count++;
+  if (it_s != structs.end()) {
+    it_s->second++;
+    free(str.structure);
     return 0;
   } else {
-    str->count = 1;
-    write_hash(str);
+    // find energy
+    str.energy = Enc.Energy(str);
+    // insert into hash
+    structs[str] = 1;
+    str.structure = allocopy(str.structure);
   }
 
   //is it canonical (noLP)
-  if (Opt.noLP && find_lone_pair(str->structure)!=-1) {
-    fprintf(stderr, "WARNING: structure \"%s\" has lone pairs, skipping...\n", pt_to_str(str->structure).c_str());
+  if (Opt.noLP && find_lone_pair(str.structure)!=-1) {
+    fprintf(stderr, "WARNING: structure \"%s\" has lone pairs, skipping...\n", pt_to_str(str.structure).c_str());
     return -2;
   }
 
   //debugging
-  if (Opt.verbose_lvl>2) fprintf(stderr, "processing: %d %s\n", num_moves, pt_to_str(str->structure).c_str());
-
-  //find energy
-  str->energy = Enc.Energy(*str);
+  if (Opt.verbose_lvl>2) fprintf(stderr, "processing: %d %s\n", num_moves, pt_to_str(str.structure).c_str());
 
   // deepest descend
   int i;
-  while ((i = move_set(*str))!=0) {
+  while ((i = move_set(str))!=0) {
     Deg.Clear();
   }
   Deg.Clear();
 
-  if (Opt.verbose_lvl>2) fprintf(stderr, "\n  %s %d\n", pt_to_str(str->structure).c_str(), str->energy);
+  // discard shallow ones (check if we have them already)
+  if (Opt.minh>0 && (output.find(str) == output.end()) && (output_shallow.find(str) == output_shallow.end())) {
+
+    // flood it a little
+    int status;
+    hash_entry *escape = flood(str, status, Opt.minh);
+
+    // while not found non-shallow one
+    while (escape) { // maybe aslo check status ??
+
+      //add to shallow set
+      if (output_shallow.find(str)!=output_shallow.end()) break;
+      output_shallow.insert(str);
+      str.structure = allocopy(str.structure);
+      if (Opt.verbose_lvl>1) fprintf(stderr, "shallow:  %s %d\n", pt_to_str(str.structure).c_str(), str.energy);
+
+      // find another minima
+      while (move_set(*escape)!=0) {
+        Deg.Clear();
+      }
+      Deg.Clear();
+
+      // try to flood again
+      hash_entry *he_tmp = flood(*escape, status, Opt.minh);
+      free_entry(escape);
+      escape = he_tmp;
+    }
+  }
+
+  if (Opt.verbose_lvl>2) fprintf(stderr, "\n  %s %d\n", pt_to_str(str.structure).c_str(), str.energy);
 
   // save for output
   map<hash_entry, int, compare_map>::iterator it;
-  hash_entry he;
-  he.structure = str->structure;
-  he.energy = str->energy;
-  he.count = 1;
-  if ((it = output.find(he)) != output.end()) {
+  if ((it = output.find(str)) != output.end()) {
     it->second++;
+    free(str.structure);
   } else {
-    he.structure = allocopy(str->structure);
-    output.insert(make_pair(he, 1));
+    output.insert(make_pair(str, 1));
   }
 
   return 1;
@@ -149,10 +172,6 @@ int main(int argc, char **argv)
 
   seq_len = strlen(seq);
 
-  // keep track of structures & statistics
-  map<hash_entry, int, compare_map> output; // structures plus energies to output (+ how many hits has this minima)
-  int not_canonical = 0;
-
   // time?
   if (args_info.verbose_lvl_arg>0) {
     fprintf(stderr, "Time to initialize: %.2f secs.\n", (clock() - clck1)/(double)CLOCKS_PER_SEC);
@@ -162,8 +181,15 @@ int main(int argc, char **argv)
   // ########################## main loop - reads structures from RNAsubopt and process them
   int count = 0;  //num of local minima
   Enc.Init(seq);
+
+  // keep track of structures & statistics
+  map<hash_entry, int, compare_map> output; // structures plus energies to output (+ how many hits has this minima)
+  set<hash_entry, compare_map> output_shallow; // shallow structures (if minh specified)
+  int not_canonical = 0;
+  // hash
+  unordered_map<hash_entry, int, hash_fncts> structs (HASHSIZE);
   while (!args_info.find_num_given || count != args_info.find_num_arg) {
-    int res = move(output);
+    int res = move(structs, output, output_shallow);
     if (res==0)   continue;
     if (res==-1)  break;
     if (res==-2)  not_canonical++;
@@ -172,8 +198,8 @@ int main(int argc, char **argv)
 
   // free hash
   //int num_of_structures = hash_size();
-  if (args_info.verbose_lvl_arg>0) print_stats();
-  kill_hash();
+  if (args_info.verbose_lvl_arg>0) print_stats(structs);
+  free_hash(structs);
 
   // time?
   if (args_info.verbose_lvl_arg>0) {
@@ -194,7 +220,6 @@ int main(int argc, char **argv)
 
   // threshold for flooding
   int threshold;
-
 
   // insert structures into vectors (insert only <num> minima)
   {
@@ -220,8 +245,6 @@ int main(int argc, char **argv)
     threshold = (thr<0 ? 0 : tmp[thr]);
   }
 
-
-
   // array of energy barriers
   float *energy_barr = NULL;
 
@@ -237,6 +260,7 @@ int main(int argc, char **argv)
       nodes[i].height = output_en[i]/100.0;
       nodes[i].label = NULL;
       nodes[i].color = 0.0;
+      nodes[i].saddle_height = 1e10;
     }
 
     int flooded = 0;
@@ -289,6 +313,7 @@ int main(int argc, char **argv)
             int child = (res_higher ? pos:i);
 
             nodes[i].saddle_height = saddle/100.0; // this is always true
+            nodes[pos].saddle_height = (nodes[pos].saddle_height > saddle/100.0 ? saddle/100 : nodes[pos].saddle_height);
             //nodes[i].color = 0.5;
 
             // some father issues
@@ -383,6 +408,8 @@ int main(int argc, char **argv)
 
   // generate barrier tree?
   if (args_info.bartree_flag) {
+
+    //PS_tree_plot(nodes, num, "tst.ps");
 
     // make tree (fill missing nodes)
     make_tree(num, energy_barr, nodes);

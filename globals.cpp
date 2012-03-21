@@ -131,7 +131,7 @@ int Options::Init(gengetopt_args_info &args_info)
   int ret = 0;
 
   if (args_info.min_num_arg<0) {
-    fprintf(stderr, "Number of local minima should be non-negative integer (min-num)\\n");
+    fprintf(stderr, "Number of local minima should be non-negative integer (min-num)\n");
     ret = -1;
   }
 
@@ -179,7 +179,7 @@ int Options::Init(gengetopt_args_info &args_info)
   if (ret ==-1) return -1;
 
   // adjust options
-  minh = args_info.minh_arg;
+  minh = (int)(args_info.minh_arg*100);
   noLP = args_info.noLP_flag;
   EOM = !args_info.useEOS_flag;
   first = args_info.useFirst_flag;

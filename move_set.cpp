@@ -413,7 +413,7 @@ hash_entry *browse_neighs(hash_entry &str, int &saddle_en)
   // count how many times called
   cnt_move++;
 
-  // unused, just for necessity of functions
+  // returned
   hash_entry *min = (hash_entry*)space(sizeof(hash_entry));
   min->energy = str.energy;
   min->structure = allocopy(str.structure);

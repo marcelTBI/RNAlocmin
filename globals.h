@@ -5,10 +5,10 @@
 
 using namespace std;
 
-#include "RNAlocmin_cmdline.h"
 extern "C" {
-  #include "hash_util.h"
+  #include "RNAlocmin_cmdline.h"
 }
+#include "hash_util.h"
 
 // minimal gap for loop
 #define MINGAP 3
@@ -37,7 +37,7 @@ public:
   ~Encoded();
 
   void Init(const char* seq);
-  short *Struct(const char *str);
+  short *Struct(const char *str);  // should be freed!!!
 
   void Forget();
   inline void Move(hash_entry &he, bool first = true, bool second = true);
@@ -52,7 +52,7 @@ public:
 class Options {
   // options
 public:
-  float minh;
+  float minh;   // leave out shallow minima (should be relativelly small)
   bool noLP;    // no lone pairs
   bool EOM;     // use energy_of_move
   bool first;   // use first descent, not deepest
@@ -106,16 +106,6 @@ public:
   ~Degen();
   void Clear();
 };
-/*
-// get global degen structure
-static Degen *get_degen();
-
-// get global options
-static Options *get_opt();
-
-// get current encoded
-static Encoded *get_enc();
-*/
 
 // some singleton objects
 extern Degen Deg;
