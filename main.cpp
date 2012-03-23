@@ -87,7 +87,7 @@ int move(unordered_map<hash_entry, int, hash_fncts> &structs, map<hash_entry, in
   Deg.Clear();
 
   // discard shallow ones (check if we have them already)
-  if (Opt.minh>0 && (output.find(str) == output.end()) && (output_shallow.find(str) == output_shallow.end())) {
+  if (Opt.minhall && Opt.minh>0 && (output.find(str) == output.end()) && (output_shallow.find(str) == output_shallow.end())) {
 
     // flood it a little
     int status;
@@ -225,7 +225,24 @@ int main(int argc, char **argv)
   {
     int i=0;
     for (map<hash_entry, int, compare_map>::iterator it=output.begin(); it!=output.end(); it++) {
+      // if not enough minima
       if (i<num) {
+        // first cheeck if the output is not shallow
+        if (!Opt.minhall && Opt.minh>0 && i<num) {
+          int saddle;
+          hash_entry *escape = flood(it->first, saddle, Opt.minh);
+
+          // shallow
+          if (escape) {
+            if (args_info.verbose_lvl_arg>0) {
+              fprintf(stderr, "shallow: %s %6.2f\n", pt_to_str(it->first.structure).c_str(), it->first.energy/100.0);
+            }
+            free_entry(escape);
+            free(it->first.structure);
+            continue;
+          }
+        }
+        // then add it to outputs.
         output_str[i]=pt_to_str(it->first.structure);
         output_num[i]=it->second;
         output_he[i]=it->first;
@@ -243,6 +260,12 @@ int main(int argc, char **argv)
     int thr = num*args_info.floodPortion_arg;
     thr--;
     threshold = (thr<0 ? 0 : tmp[thr]);
+  }
+
+    // time?
+  if (args_info.verbose_lvl_arg>0) {
+    fprintf(stderr, "Discarding shallow minima: %.2f secs.\n", (clock() - clck1)/(double)CLOCKS_PER_SEC);
+    clck1 = clock();
   }
 
   // array of energy barriers

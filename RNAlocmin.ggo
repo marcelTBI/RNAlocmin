@@ -18,7 +18,8 @@ option "min-num"            n "Maximal number of local minima returned\n(0 == un
 option "find-num"           - "Maximal number of local minima found\n(default = unlimited - crawl through whole file)" int no
 option "verbose-lvl"        v "Level of verbosity (0 = nothing, 4 = full)\n WARNING: higher verbose levels increase computation time" int default="0" no
 option "depth"              d "Depth of findpath search (higher value increases running time)" int default="10" no
-option "minh"               - "Print only minima with energy barrier greater than this (untested)" double default="0.0" no hidden
+option "minh"               - "Print only minima with energy barrier greater than this" double default="0.0" no
+option "minhall"            - "Apply minh flooding during descend walks (much slower)" flag off
 option "noLP"               - "Work only with canonical RNA structures (w/o isolated base pairs)" flag off
 option "useEOS"             e "Use energy_of_structure_pt calculation instead of energy_of_move (slower, it should not affect results)" flag off
 option "useFirst"           - "Use first found lower energy structure instead of deepest during walk down" flag off

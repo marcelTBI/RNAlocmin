@@ -180,6 +180,7 @@ int Options::Init(gengetopt_args_info &args_info)
 
   // adjust options
   minh = (int)(args_info.minh_arg*100);
+  minhall = args_info.minhall_flag;
   noLP = args_info.noLP_flag;
   EOM = !args_info.useEOS_flag;
   first = args_info.useFirst_flag;
