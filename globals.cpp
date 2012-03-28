@@ -3,6 +3,7 @@
 #include <string.h>
 #include <math.h>
 #include <limits.h>
+#include <time.h>
 
 extern "C" {
   #include "pair_mat.h"
@@ -43,8 +44,60 @@ void Encoded::Init(const char *seq)
   this->seq = (char*) space((strlen(seq)+1)*sizeof(char));
   strcpy(this->seq, seq);
 
+  srand(time(NULL));
+
   s0   = encode_sequence(seq, 0);
   s1   = encode_sequence(seq, 1);
+}
+
+void Encoded::PossMoves(hash_entry &str)
+{
+  moves_to.clear();
+  moves_from.clear();
+  moves_to.reserve(2*str.structure[0]);
+  moves_from.reserve(2*str.structure[0]);
+
+  // generate all possible moves (less than n^2)
+  for (int i=1; i<=str.structure[0]; i++) {
+    if (str.structure[i]!=0) {
+      if (str.structure[i]<i) continue;
+      moves_from.push_back(-i);
+      moves_to.push_back(-str.structure[i]);
+      //fprintf(stderr, "add  d(%d, %d)\n", i, str.structure[i]);
+    } else {
+      for (int j=i+1; j<=str.structure[0]; j++) {
+        //fprintf(stderr, "check (%d, %d)\n", i, j);
+        if (str.structure[j]==0) {
+          if (try_insert(seq,i,j)) {
+            moves_from.push_back(i);
+            moves_to.push_back(j);
+            //fprintf(stderr, "add  i(%d, %d)\n", i, j);
+            continue;
+          }
+        } else if (str.structure[j]>j) { // '('
+          j = str.structure[j];
+        } else break;
+      }
+    }
+  }
+}
+
+void Encoded::Permute()
+{
+    if (Opt.verbose_lvl>2) {
+    for (unsigned int i=0; i<moves_from.size(); i++) {
+      fprintf(stderr, "(%d %d) ", moves_from[i], moves_to[i]);
+    }
+    fprintf(stderr, "\n");
+  }
+  for (unsigned int i=0; i<moves_from.size()-1; i++) {
+    int rnd = rand();
+    rnd = rnd % (moves_from.size()-i) + i;
+    swap(moves_from[i], moves_from[rnd]);
+    swap(moves_to[i], moves_to[rnd]);
+  }
+
+
 }
 
 short *Encoded::Struct(const char *str)
@@ -75,7 +128,6 @@ int Encoded::EnergyOfMove(hash_entry &he)
   he.energy = tmp_en;
   return tmp_en;
 }
-
 
 inline void do_move(short *pt, int bp_left, int bp_right)
 {
@@ -183,7 +235,8 @@ int Options::Init(gengetopt_args_info &args_info)
   minhall = args_info.minhall_flag;
   noLP = args_info.noLP_flag;
   EOM = !args_info.useEOS_flag;
-  first = args_info.useFirst_flag;
+  first = args_info.walk_arg[0]=='F';
+  rand = args_info.walk_arg[0]=='R';
   f_point = NULL;
   shift = args_info.move_arg[0]=='S';
   verbose_lvl = args_info.verbose_lvl_arg;

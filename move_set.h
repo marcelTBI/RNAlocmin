@@ -32,8 +32,11 @@ int find_lone_pair(short* str);
 
 // ################################################### BIG (IMPORTANT) FUNCTIONS
 
-// move to deepest neighbour (returns minimum in enc, deepest) returns 0 when minimum has been found
+// move to deepest(first) neighbour (returns minimum in str) returns 0 when minimum has been found
 int move_set(hash_entry &str);
+
+// move to random neighbour (returns minimum in str) returns 0 when minimum has been found
+int move_rand(hash_entry &str);
 
 // browse neighbours and apply funct (from Opt) on all of them (returns minimum) return saddle energy in saddle_en (in flooding) return if funct(str) returns true
 hash_entry *browse_neighs(hash_entry &str, int &saddle_en);

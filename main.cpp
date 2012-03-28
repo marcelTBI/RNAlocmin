@@ -26,9 +26,6 @@ extern "C" {
 
 using namespace std;
 
-static int num_moves = 0;
-static int seq_len;
-
 int move(unordered_map<hash_entry, int, hash_fncts> &structs, map<hash_entry, int, compare_map> &output, set<hash_entry, compare_map> &output_shallow)
 {
   // count moves
@@ -79,9 +76,9 @@ int move(unordered_map<hash_entry, int, hash_fncts> &structs, map<hash_entry, in
   //debugging
   if (Opt.verbose_lvl>2) fprintf(stderr, "processing: %d %s\n", num_moves, pt_to_str(str.structure).c_str());
 
-  // deepest descend
+  // descend
   int i;
-  while ((i = move_set(str))!=0) {
+  while ((i = (Opt.rand? move_rand(str) : move_set(str)))!=0) {
     Deg.Clear();
   }
   Deg.Clear();
@@ -94,7 +91,7 @@ int move(unordered_map<hash_entry, int, hash_fncts> &structs, map<hash_entry, in
     hash_entry *escape = flood(str, status, Opt.minh);
 
     // while not found non-shallow one
-    while (escape) { // maybe aslo check status ??
+    while (escape) {
 
       //add to shallow set
       if (output_shallow.find(str)!=output_shallow.end()) break;

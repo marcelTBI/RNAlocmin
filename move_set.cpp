@@ -21,17 +21,14 @@ extern "C" {
 static int cnt_move = 0;
 int count_move() {return cnt_move;}
 
-// compatible base pair?
-inline bool compat(char a, char b);
-
 // done with all structures along the way to deepest
 int update_deepest(hash_entry &str, hash_entry &min);
 
 // if the base is lone
 inline bool lone_base(short *pt, int i);
 
-// try insert base pair (i,j)
-inline bool try_insert(short *pt, const char *seq, int i, int j);
+// can move be done on this structure? (move is in the Enc)
+bool check_insert(hash_entry &str, int i, int j);
 
 // ############################## IMPLEMENTATION #####################################
 
@@ -49,22 +46,6 @@ char* my_getline(FILE *fp)
     strcat (line, s);
   } while (cp == NULL);
   return (line);
-}
-
-// compatible base pair?
-inline bool compat(char a, char b) {
-  if (a=='A' && b=='U') return true;
-  if (a=='C' && b=='G') return true;
-  if (a=='G' && b=='U') return true;
-  if (a=='U' && b=='A') return true;
-  if (a=='G' && b=='C') return true;
-  if (a=='U' && b=='G') return true;
-  // and with T's
-  if (a=='A' && b=='T') return true;
-  if (a=='T' && b=='A') return true;
-  if (a=='G' && b=='T') return true;
-  if (a=='T' && b=='G') return true;
-  return false;
 }
 
 // done with all structures along the way to deepest
@@ -407,6 +388,75 @@ int move_set(hash_entry &str)
   return cnt;
 }
 
+int move_rand(hash_entry &str){
+  // count how many times called
+  cnt_move++;
+
+  // count better neighbours
+  int cnt = 0;
+
+  // deepest descent
+  hash_entry min;
+  min.structure = allocopy(str.structure);
+  min.energy = str.energy;
+  Deg.current = str.energy;
+
+  if (Opt.verbose_lvl>3) fprintf(stderr, "\n  start of MR:\n  %s %d\n\n", pt_to_str(str.structure).c_str(), str.energy);
+
+  // construct and permute possible moves
+  Enc.PossMoves(str);
+  Enc.Permute();
+
+  // crawl through possible ones
+ /* for (unsigned int i=0; i<Enc.moves_from.size(); i++) {
+    if (str.structure[Enc.moves_from[i]]==0 && str.structure[Enc.moves_to[i]]==0) { // insert
+      if (!check_insert(str, Enc.moves_from[i], Enc.moves_to[i])) continue;
+      Enc.bp_left = Enc.moves_from[i];
+      Enc.bp_right = Enc.moves_to[i];
+    } else if (str.structure[Enc.moves_from[i]]==Enc.moves_to[i]) {  // delete
+      Enc.bp_left = -Enc.moves_from[i];
+      Enc.bp_right = -Enc.moves_to[i];
+    } else continue;*/
+
+  for (unsigned int i=0; i<Enc.moves_from.size(); i++) {
+    Enc.bp_left = Enc.moves_from[i];
+    Enc.bp_right = Enc.moves_to[i];
+    //if (Opt.verbose_lvl>3) fprintf(stderr, "\n  start of MR:\n  %s %d\n\n", pt_to_str(str.structure).c_str(), str.energy);
+    cnt = update_deepest(str, min);
+    if (cnt) break;
+  }
+
+  // if degeneracy occurs, solve it!
+  if (!cnt && Deg.unprocessed.size()>0) {
+    if(Deg.current!=str.energy) throw;
+    Deg.processed.insert(allocopy(str.structure));
+    // take first to structure
+    if (str.structure) free(str.structure);
+    str.structure = (*Deg.unprocessed.begin());
+    Deg.unprocessed.erase(Deg.unprocessed.begin());
+    cnt += move_rand(str);
+  } else {
+    // write output to str
+    copy_arr(str.structure, min.structure);
+    str.energy = min.energy;
+  }
+  // release minimal
+  free(min.structure);
+
+  // resolve degeneracy in local minima
+  if (Deg.processed.size()>0) {
+    Deg.processed.insert(str.structure);
+    str.structure = *Deg.processed.begin();
+    if(Deg.current!=str.energy) throw;
+    Deg.processed.erase(Deg.processed.begin());
+
+    if (!Deg.unprocessed.empty()) fprintf(stderr, "WARNING: Deg.unprocessed not empty!!!\n");
+    Deg.Clear();
+  }
+
+  return cnt;
+}
+
 // browse neighbours without degeneracy (almost the same as move_set) assume Deg.first = true
 hash_entry *browse_neighs(hash_entry &str, int &saddle_en)
 {
@@ -508,14 +558,6 @@ int find_lone_pair(short* str)
   return -1;
 }
 
-// try insert base pair (i,j)
-bool try_insert(short *pt, const char *seq, int i, int j)
-{
-  if (i<=0 || j<=0 || i>pt[0] || j>pt[0]) return false;
-  return (j-i>MINGAP && pt[j]==0 && pt[i]==0 && compat(seq[i-1], seq[j-1]));
-}
-
-
 // print rates to a file
 void print_rates(char *filename, double temp, int num, float *energy_barr, vector<int> &output_en)
 {
@@ -545,10 +587,28 @@ string pt_to_str(short *pt)
 {
   string str;
   str.resize(pt[0]);
+  //fprintf(stderr, "pt_to_str %d\n", pt[0]);
   for (int i=1; i<=pt[0]; i++) {
     if (pt[i]==0) str[i-1]='.';
     else if (pt[i]<i) str[i-1]=')';
     else str[i-1]='(';
   }
   return str;
+}
+
+// can insert be done on this structure?
+bool check_insert(hash_entry &str, int i, int j)
+{
+  int cnt = 0;
+  for (i++; i<j; i++) {
+    if (str.structure[i]==0) continue;
+    if (str.structure[i]>str.structure[str.structure[i]]) { //'('
+      cnt++;
+    } else { // ')'
+      cnt--;
+      if (cnt<0) return false;
+    }
+  }
+  if (cnt!=0) return false;
+  return true;
 }
