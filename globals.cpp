@@ -241,6 +241,7 @@ int Options::Init(gengetopt_args_info &args_info)
   shift = args_info.move_arg[0]=='S';
   verbose_lvl = args_info.verbose_lvl_arg;
   floodMax = args_info.floodMax_arg;
+  rna2d = args_info.rna2D_flag;
 
   return ret;
 }

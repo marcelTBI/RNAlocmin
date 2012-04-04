@@ -3,6 +3,7 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#include <limits.h>
 
 #include <string>
 #include <set>
@@ -38,19 +39,42 @@ int move(unordered_map<hash_entry, int, hash_fncts> &structs, map<hash_entry, in
     free(structure);
     return 0;
   }
+
+  float energy=1e10;
+
+  // if input from RNA2Dfold - preprocess lines
+  char *p = structure;
+  char *sep = " \t";
+  if (Opt.rna2d) {
+    p = strtok(structure, sep);
+    p = strtok(NULL, sep);
+    p = strtok(NULL, sep);
+    if (p[0]!='.' && p[0]!='(' && p[0]!=')') {
+      sscanf(p, "%f", &energy);
+      p = strtok(NULL, sep);
+    } else {
+      char *r = strtok(NULL, sep);
+      sscanf(r, "%f", &energy);
+    }
+  }
+  if (p == NULL) {
+    fprintf(stderr, "ERROR: structure is not on 3rd or 4th column (bad use of --rna2D option?)\n");
+    return -1;
+  }
+
   // find length of structure
   int len=0;
-  while (structure[len]!='\0' && structure[len]!=' ') len++;
+  while (p[len]!='\0' && p[len]!=' ') len++;
 
   if (len!=seq_len) {
-    fprintf(stderr, "Unequal lengths:\n(structure) %s\n (sequence) %s\n", structure, Enc.seq);
+    fprintf(stderr, "Unequal lengths:\n(structure) %s\n (sequence) %s\n", p, Enc.seq);
     free(structure);
     return -1;
   }
 
   // was it before?
   hash_entry str;
-  str.structure = Enc.Struct(structure);
+  str.structure = Enc.Struct(p);
   free(structure);
   unordered_map<hash_entry, int, hash_fncts>::iterator it_s = structs.find(str);
   //hash_entry *tmp_h = (hash_entry*)lookup_hash(str);
@@ -60,8 +84,9 @@ int move(unordered_map<hash_entry, int, hash_fncts> &structs, map<hash_entry, in
     free(str.structure);
     return 0;
   } else {
-    // find energy
+    // find energy only if not in input (not done)
     str.energy = Enc.Energy(str);
+
     // insert into hash
     structs[str] = 1;
     str.structure = allocopy(str.structure);
@@ -174,6 +199,9 @@ int main(int argc, char **argv)
     fprintf(stderr, "Time to initialize: %.2f secs.\n", (clock() - clck1)/(double)CLOCKS_PER_SEC);
     clck1 = clock();
   }
+
+  // if input from RNA2dfold, discard first 5 lines
+  if (Opt.rna2d) for (int i=0;i<5;i++) free(my_getline(stdin));
 
   // ########################## main loop - reads structures from RNAsubopt and process them
   int count = 0;  //num of local minima

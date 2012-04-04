@@ -1,6 +1,6 @@
 # Name of your program
 package "RNAlocmin" # don't use package if you're using automake
-purpose "Calculate local minima from RNAsubopt -p output file. Example usage: \n\
+purpose "Calculate local minima from RNAsubopt -p output file (or from RNA2Dfold). Example usage: \n\
     RNAsubopt -p 10000 < \"sequence.txt\" > \"suboptp.txt\"\n\
     RNAlocmin -s \"sequence.txt\" [OPTIONS] < \"suboptp.txt\""
 
@@ -23,6 +23,7 @@ option "minhall"            - "Apply minh flooding during descend walks (much sl
 option "noLP"               - "Work only with canonical RNA structures (w/o isolated base pairs, cannot be combined with walk R option)" flag off
 option "walk"               w "Walking method used\nD ==> gradient descent\nF ==> use first found lower energy structure\nR ==> use random lower energy structure (does not work with --noLP and -m S options)" values="D","F","R" default="D" no
 option "useEOS"             e "Use energy_of_structure_pt calculation instead of energy_of_move (slower, it should not affect results)" flag off
+option "rna2D"              - "Assume input from RNA2Dfold" flag off
 
 section "Misc"
 option "numIntervals"       - "Number of intervals for Jing's visualisation" int default="0" no
