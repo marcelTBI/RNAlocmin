@@ -16,6 +16,7 @@ extern "C" {
   #include "findpath.h"
   #include "RNAlocmin_cmdline.h"
   #include "utils.h"
+  #include "read_epars.h"
 }
 
 #include "hash_util.h"
@@ -49,6 +50,10 @@ int move(unordered_map<hash_entry, int, hash_fncts> &structs, map<hash_entry, in
     p = strtok(structure, sep);
     p = strtok(NULL, sep);
     p = strtok(NULL, sep);
+    if (p == NULL) {
+      fprintf(stderr, "Input is NOT a valid RNA2Dfold output file! Wrong use of --rna2D option?\n");
+      exit(EXIT_FAILURE);
+    }
     if (p[0]!='.' && p[0]!='(' && p[0]!=')') {
       sscanf(p, "%f", &energy);
       p = strtok(NULL, sep);
@@ -166,6 +171,11 @@ int main(int argc, char **argv)
   if (Opt.Init(args_info) !=0 ) {
     fprintf(stderr, "ERROR: one or more bad arguments, exiting...\n");
     exit(EXIT_FAILURE);
+  }
+
+  // read parameter file
+  if (args_info.paramFile_given) {
+    read_parameter_file(args_info.paramFile_arg);
   }
 
   // read sequence

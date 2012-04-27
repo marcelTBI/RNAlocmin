@@ -24,6 +24,7 @@ option "noLP"               - "Work only with canonical RNA structures (w/o isol
 option "walk"               w "Walking method used\nD ==> gradient descent\nF ==> use first found lower energy structure\nR ==> use random lower energy structure (does not work with --noLP and -m S options)" values="D","F","R" default="D" no
 option "useEOS"             e "Use energy_of_structure_pt calculation instead of energy_of_move (slower, it should not affect results)" flag off
 option "rna2D"              - "Assume input from RNA2Dfold" flag off
+option "paramFile"          P "Read energy parameters from paramfile, instead of using the default parameter set." string no
 
 section "Misc"
 option "numIntervals"       - "Number of intervals for Jing's visualisation" int default="0" no
