@@ -228,6 +228,11 @@ int Options::Init(gengetopt_args_info &args_info)
     ret = -1;
   }
 
+  if (args_info.dangles_arg<0 || args_info.dangles_arg>3) {
+    fprintf(stderr, "Dangle treatment constant should be 0, 1, 2, or 3\n");
+    ret = -1;
+  }
+
   if (ret ==-1) return -1;
 
   // adjust options

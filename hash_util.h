@@ -19,6 +19,8 @@ typedef struct _hash_entry {
   short *structure;    /* my structure */
   int energy;       /* my energy */
 
+  int num; // just for noSort
+
   bool operator==(const _hash_entry &second) const{
     int i=1;
     while (i<=structure[0] && structure[i]==second.structure[i]) {

@@ -17,6 +17,7 @@ extern "C" {
   #include "RNAlocmin_cmdline.h"
   #include "utils.h"
   #include "read_epars.h"
+  #include "fold_vars.h"
 }
 
 #include "hash_util.h"
@@ -45,7 +46,7 @@ int move(unordered_map<hash_entry, int, hash_fncts> &structs, map<hash_entry, in
 
   // if input from RNA2Dfold - preprocess lines
   char *p = structure;
-  char *sep = " \t";
+  char *sep = " \t\n";
   if (Opt.rna2d) {
     p = strtok(structure, sep);
     p = strtok(NULL, sep);
@@ -67,6 +68,8 @@ int move(unordered_map<hash_entry, int, hash_fncts> &structs, map<hash_entry, in
     return -1;
   }
 
+  // if there are other columns...
+  p = strtok(structure, sep);
   // find length of structure
   int len=0;
   while (p[len]!='\0' && p[len]!=' ') len++;
@@ -150,6 +153,7 @@ int move(unordered_map<hash_entry, int, hash_fncts> &structs, map<hash_entry, in
     it->second++;
     free(str.structure);
   } else {
+    str.num = output.size();
     output.insert(make_pair(str, 1));
   }
 
@@ -176,6 +180,11 @@ int main(int argc, char **argv)
   // read parameter file
   if (args_info.paramFile_given) {
     read_parameter_file(args_info.paramFile_arg);
+  }
+
+  // dangle setup
+  if (args_info.dangles_given) {
+    dangles = args_info.dangles_arg;
   }
 
   // read sequence
@@ -247,7 +256,9 @@ int main(int argc, char **argv)
   vector<string> output_str;
   output_str.resize(num);
   vector<hash_entry> output_he;
-  output_he.resize(num);
+  hash_entry h;
+  h.structure = NULL;
+  output_he.resize(num, h);
   vector<int> output_en;
   output_en.resize(num);
   vector<int> output_num;
@@ -262,7 +273,7 @@ int main(int argc, char **argv)
     for (map<hash_entry, int, compare_map>::iterator it=output.begin(); it!=output.end(); it++) {
       // if not enough minima
       if (i<num) {
-        // first cheeck if the output is not shallow
+        // first check if the output is not shallow
         if (!Opt.minhall && Opt.minh>0 && i<num) {
           int saddle;
           hash_entry *escape = flood(it->first, saddle, Opt.minh);
@@ -278,16 +289,39 @@ int main(int argc, char **argv)
           }
         }
         // then add it to outputs.
-        output_str[i]=pt_to_str(it->first.structure);
-        output_num[i]=it->second;
-        output_he[i]=it->first;
-        output_en[i]=it->first.energy;
-        i++;
+        if (args_info.noSort_flag) {
+          if (it->first.num<num) {
+            output_str[it->first.num]=pt_to_str(it->first.structure);
+            output_num[it->first.num]=it->second;
+            output_he[it->first.num]=it->first;
+            output_en[it->first.num]=it->first.energy;
+            //printf("%d ", it->first.num);
+            i++;
+          }
+        } else {
+          output_str[i]=pt_to_str(it->first.structure);
+          output_num[i]=it->second;
+          output_he[i]=it->first;
+          output_en[i]=it->first.energy;
+          i++;
+        }
       } else { // we have enough minima
         free(it->first.structure);
       }
     }
     output.clear();
+
+    // erase possible NULL elements...
+    if (args_info.noSort_flag) {
+      for (int j=output_he.size()-1; j>=0; j--) {
+        if (output_he[j].structure==NULL) {
+          output_he.erase(output_he.begin()+j);
+          output_str.erase(output_str.begin()+j);
+          output_en.erase(output_en.begin()+j);
+          output_num.erase(output_num.begin()+j);
+        }
+      }
+    }
 
     // threshold for flooding
     vector<int> tmp = output_num;

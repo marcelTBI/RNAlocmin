@@ -17,7 +17,7 @@ option "move"               m "Move set:\nI ==> insertion & deletion of base pai
 option "min-num"            n "Maximal number of local minima returned\n(0 == unlimited)" int default="100" no
 option "find-num"           - "Maximal number of local minima found\n(default = unlimited - crawl through whole file)" int no
 option "verbose-lvl"        v "Level of verbosity (0 = nothing, 4 = full)\n WARNING: higher verbose levels increase computation time" int default="0" no
-option "depth"              d "Depth of findpath search (higher value increases running time)" int default="10" no
+option "depth"              - "Depth of findpath search (higher value increases running time)" int default="10" no
 option "minh"               - "Print only minima with energy barrier equal or greater than this" double default="0.0" no
 option "minhall"            - "Apply minh flooding during descend walks (much slower)" flag off
 option "noLP"               - "Work only with canonical RNA structures (w/o isolated base pairs, cannot be combined with walk R option)" flag off
@@ -25,6 +25,17 @@ option "walk"               w "Walking method used\nD ==> gradient descent\nF ==
 option "useEOS"             e "Use energy_of_structure_pt calculation instead of energy_of_move (slower, it should not affect results)" flag off
 option "rna2D"              - "Assume input from RNA2Dfold" flag off
 option "paramFile"          P "Read energy parameters from paramfile, instead of using the default parameter set." string no
+option "noSort"             - "Don't sort the output (this is currently SLOWER than with sorting)" flag off
+option "dangles"            d "How to treat \"dangling end\" energies for bases adjacent to helices in free ends and multi-loops\n"
+details="\nWith -d1 only unpaired bases can participate in at most one dangling end, this is the\
+ default for mfe folding but unsupported for the partition function folding.\n\nWith -d2 this check is ignored,\
+ dangling energies will be added for the bases adjacent to a helix on both sides in any case; this is the\
+ default for partition function folding (-p).\nThe option -d0 ignores dangling ends altogether (mostly for\
+ debugging).\nWith -d3 mfe folding will allow coaxial stacking of adjacent helices in multi-loops. At the\
+ moment the implementation will not allow coaxial stacking of the two interior pairs in a loop of degree 3\
+ and works only for mfe folding.\n\nNote that by default (as well as with -d1 and -d3) pf and mfe folding\
+ treat dangling ends differently. Use -d2 in addition to -p to ensure that both algorithms use the same\
+ energy model.\n\n" int default="2" optional
 
 section "Misc"
 option "numIntervals"       - "Number of intervals for Jing's visualisation" int default="0" no
