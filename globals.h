@@ -75,7 +75,6 @@ public:
   bool shift;   // use shifts?
   int verbose_lvl; // level of verbosity
   int floodMax; // cap for flooding
-  bool rna2d;   // input from RNA2Dfold
 
   // pointer to function used on every neighbour (in update deepest)
   bool (*f_point) (hash_entry &);  // (I dont like it either, but it was easiest way to program it...:/ )

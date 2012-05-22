@@ -23,7 +23,6 @@ option "minhall"            - "Apply minh flooding during descend walks (much sl
 option "noLP"               - "Work only with canonical RNA structures (w/o isolated base pairs, cannot be combined with walk R option)" flag off
 option "walk"               w "Walking method used\nD ==> gradient descent\nF ==> use first found lower energy structure\nR ==> use random lower energy structure (does not work with --noLP and -m S options)" values="D","F","R" default="D" no
 option "useEOS"             e "Use energy_of_structure_pt calculation instead of energy_of_move (slower, it should not affect results)" flag off
-option "rna2D"              - "Assume input from RNA2Dfold" flag off
 option "paramFile"          P "Read energy parameters from paramfile, instead of using the default parameter set." string no
 option "noSort"             - "Don't sort the output (this is currently SLOWER than with sorting)" flag off
 option "dangles"            d "How to treat \"dangling end\" energies for bases adjacent to helices in free ends and multi-loops\n"

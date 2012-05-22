@@ -29,61 +29,79 @@ extern "C" {
 
 using namespace std;
 
+inline bool isStruct(char *p)
+{
+  // check first two chars - should be enough
+  if ((p[0]=='.' || p[0]=='(' || p[0]==')') && (p[1]=='.' || p[1]=='(' || p[1]==')')) return true;
+  else return false;
+}
+
+inline bool isEnergy(char *p, float &energy)
+{
+  if (sscanf(p, "%f", &energy) == 1 && energy<100.0 && energy >-200.0) return true;
+  else return false;
+}
+
 int move(unordered_map<hash_entry, int, hash_fncts> &structs, map<hash_entry, int, compare_map> &output, set<hash_entry, compare_map> &output_shallow)
 {
   // count moves
   num_moves++;
 
-  // read a structure
-  char *structure = my_getline(stdin);
-  if (structure == NULL) return -1;
-  if (structure[0]=='>') {
-    free(structure);
+  // read a line
+  char *line = my_getline(stdin);
+  if (line == NULL) return -1;
+  if (line[0]=='>') {
+    free(line);
     return 0;
   }
 
   float energy=1e10;
 
-  // if input from RNA2Dfold - preprocess lines
-  char *p = structure;
+  // process lines
+  char *p = line;
   char *sep = " \t\n";
-  if (Opt.rna2d) {
-    p = strtok(structure, sep);
-    p = strtok(NULL, sep);
-    p = strtok(NULL, sep);
-    if (p == NULL) {
-      fprintf(stderr, "Input is NOT a valid RNA2Dfold output file! Wrong use of --rna2D option?\n");
-      exit(EXIT_FAILURE);
-    }
-    if (p[0]!='.' && p[0]!='(' && p[0]!=')') {
-      sscanf(p, "%f", &energy);
-      p = strtok(NULL, sep);
+  char *temp;
+
+  bool struct_found = false;
+  bool energy_found = false;
+
+  p = strtok(line, sep);
+  while(p!=NULL && !(struct_found && energy_found)) {
+    //fprintf(stderr, "%s\n", p);
+    if (isStruct(p)) {
+      if (struct_found) fprintf(stderr, "On line \"%s\" two structure-like sequences found!\n", line);
+      else {
+        temp = p;
+      }
+      struct_found = true;
     } else {
-      char *r = strtok(NULL, sep);
-      sscanf(r, "%f", &energy);
+      if (isEnergy(p, energy)) {
+        energy_found = true;
+      }
     }
+
+    p = strtok(NULL, sep);
   }
-  if (p == NULL) {
-    fprintf(stderr, "ERROR: structure is not on 3rd or 4th column (bad use of --rna2D option?)\n");
-    return -1;
+  p = temp;
+  if (!struct_found) {
+    free(line);
+    return 0;
   }
 
-  // if there are other columns...
-  p = strtok(structure, sep);
   // find length of structure
   int len=0;
   while (p[len]!='\0' && p[len]!=' ') len++;
 
   if (len!=seq_len) {
     fprintf(stderr, "Unequal lengths:\n(structure) %s\n (sequence) %s\n", p, Enc.seq);
-    free(structure);
+    free(line);
     return -1;
   }
 
   // was it before?
   hash_entry str;
   str.structure = Enc.Struct(p);
-  free(structure);
+  free(line);
   unordered_map<hash_entry, int, hash_fncts>::iterator it_s = structs.find(str);
   //hash_entry *tmp_h = (hash_entry*)lookup_hash(str);
   // if it was - release memory + get another
@@ -92,8 +110,12 @@ int move(unordered_map<hash_entry, int, hash_fncts> &structs, map<hash_entry, in
     free(str.structure);
     return 0;
   } else {
-    // find energy only if not in input (not done)
+    // find energy only if not in input (not working - does energy_of_move require energy_of_struct run first???)
     str.energy = Enc.Energy(str);
+    /*if (1 || !energy_found) str.energy = Enc.Energy(str);
+    else str.energy = (int)(energy*100.0+(energy<0.0 ? -0.5 : 0.5));*/
+
+    //if (en != str.energy) fprintf(stderr, "%d %d\n", en, str.energy);
 
     // insert into hash
     structs[str] = 1;
@@ -218,9 +240,6 @@ int main(int argc, char **argv)
     fprintf(stderr, "Time to initialize: %.2f secs.\n", (clock() - clck1)/(double)CLOCKS_PER_SEC);
     clck1 = clock();
   }
-
-  // if input from RNA2dfold, discard first 5 lines
-  if (Opt.rna2d) for (int i=0;i<5;i++) free(my_getline(stdin));
 
   // ########################## main loop - reads structures from RNAsubopt and process them
   int count = 0;  //num of local minima
