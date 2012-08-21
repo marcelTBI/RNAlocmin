@@ -358,12 +358,15 @@ int main(int argc, char **argv)
 
   // array of energy barriers
   float *energy_barr = NULL;
+  bool *findpath_barr = NULL;
 
   // find saddles - fill energy barriers
   nodeT nodes[num];
   if (args_info.rates_flag || args_info.bartree_flag) {
     energy_barr = (float*) malloc(num*num*sizeof(float));
     for (int i=0; i<num*num; i++) energy_barr[i]=1e10;
+    findpath_barr = (bool*) malloc(num*num*sizeof(bool));
+    for (int i=0; i<num*num; i++) findpath_barr[i]=false;
 
     // fill nodes
     for (int i=0; i<num; i++) {
@@ -375,6 +378,8 @@ int main(int argc, char **argv)
     }
 
     int flooded = 0;
+    // init union-findset
+    init_union(num);
     // first try to flood the highest bins
     for (int i=num-1; i>=0; i--) {
       // flood only if low number of walks ended there
@@ -397,7 +402,6 @@ int main(int argc, char **argv)
                     output_str[i].c_str(), output_he[i].energy/100.0);
           }
         }
-
         // if flood succesfull - walk down to find father minima
         if (he) {
           // walk down
@@ -411,7 +415,7 @@ int main(int argc, char **argv)
           it = lower_bound(output_he.begin(), output_he.end(), *he, compare_vect);
 
           if (args_info.verbose_lvl_arg>1) fprintf(stderr, "minimum: %s %.2f\n", pt_to_str(he->structure).c_str(), he->energy/100.0);
-          // we dont need he again
+          // we dont need it again
           free_entry(he);
 
           if (it!=output_he.end()) {
@@ -419,12 +423,13 @@ int main(int argc, char **argv)
             if (args_info.verbose_lvl_arg>1) fprintf(stderr, "found father at pos: %d\n", pos);
 
             // which one is father?
-            bool res_higher = compare_vect(output_he[i], output_he[pos]); // is found minima higher in energy than flooded min?
-            int father = (res_higher ? i:pos);
-            int child = (res_higher ? pos:i);
+            /*bool i_father = compare_vect(output_he[i], output_he[pos]); // is found minima higher in energy than flooded min?
+            int father = (i_father ? i:pos);
+            int child = (i_father ? pos:i);*/
 
-            nodes[i].saddle_height = saddle/100.0; // this is always true
-            nodes[pos].saddle_height = (nodes[pos].saddle_height > saddle/100.0 ? saddle/100 : nodes[pos].saddle_height);
+            /*nodes[i].saddle_height = saddle/100.0; // this is always true
+            // if we change father of pos - change also its saddle_height
+            if (i_father && (nodes[pos].father==-1 || nodes[pos].father>i)) nodes[pos].saddle_height = saddle/100.0;
             //nodes[i].color = 0.5;
 
             // some father issues
@@ -446,10 +451,14 @@ int main(int argc, char **argv)
             // add new one and recompute existing fathers
             if (nodes[chng_child].father != father) {
               add_father(nodes, chng_child, chng_father, 0.0);
-            }
+            }*/
 
             flooded++;
             energy_barr[i*num+pos] = energy_barr[pos*num+i] = saddle/100.0;
+
+            // union set
+            //fprintf(stderr, "join: %d %d\n", min(i, pos), max(i, pos));
+            union_set(min(i, pos), max(i, pos));
           }
         }
       }
@@ -458,19 +467,34 @@ int main(int argc, char **argv)
     // time?
     if (args_info.verbose_lvl_arg>0) {
       fprintf(stderr, "Flood(%d(%d)/%d): %.2f secs.\n", flooded, (int)(num*args_info.floodPortion_arg), num, (clock() - clck1)/(double)CLOCKS_PER_SEC);
-      if (args_info.verbose_lvl_arg>1) {
-        fprintf(stderr, "Minima left to findpath (their father = -1): ");
-        for (int i=0; i<num; i++) {
-          if (nodes[i].father == -1) fprintf(stderr, "%d ", i);
-        }
-        fprintf(stderr, "\n");
-      }
       clck1 = clock();
     }
 
-    // for others, just do findpath.
+    // for others, just do findpath
     int findpath = 0;
-    for (int i=0; i<num; i++) {
+    set<int> to_findpath;
+    for (int i=0; i<num; i++) to_findpath.insert(find(i));
+
+    if (args_info.verbose_lvl_arg>1) {
+      fprintf(stderr, "Minima left to findpath (their father = -1): ");
+      for (set<int>::iterator it=to_findpath.begin(); it!=to_findpath.end(); it++) {
+        fprintf(stderr, "%d ", *it);
+      }
+      fprintf(stderr, "\n");
+    }
+
+    // findpath:
+    for (set<int>::iterator it=to_findpath.begin(); it!=to_findpath.end(); it++) {
+      set<int>::iterator it2=it;
+      it2++;
+      for (; it2!=to_findpath.end(); it2++) {
+        energy_barr[(*it2)*num+(*it)] = energy_barr[(*it)*num+(*it2)] = find_saddle(seq, output_str[*it].c_str(), output_str[*it2].c_str(), args_info.depth_arg)/100.0;
+        findpath_barr[(*it2)*num+(*it)] = findpath_barr[(*it)*num+(*it2)] = true;
+        findpath++;
+      }
+    }
+
+    /*for (int i=0; i<num; i++) {
       if (nodes[i].father != -1) continue;
 
       for (int j=0; j<num; j++) {
@@ -489,14 +513,14 @@ int main(int argc, char **argv)
           findpath++;
         }
       }
-    }
+    }*/
     // debug output
     if (args_info.verbose_lvl_arg>2) {
       fprintf(stderr, "Energy barriers:\n");
       //bool symmetric = true;
       for (int i=0; i<num; i++) {
         for (int j=0; j<num; j++) {
-          fprintf(stderr, "%6.2f ", energy_barr[i*num+j]);
+          fprintf(stderr, "%8.2g%c ", energy_barr[i*num+j], (findpath_barr[i*num+j]?'~':' '));
           //if (energy_barr[i*num+j] != energy_barr[j*num+i]) symmetric = false;
         }
         fprintf(stderr, "\n");
@@ -523,7 +547,7 @@ int main(int argc, char **argv)
     //PS_tree_plot(nodes, num, "tst.ps");
 
     // make tree (fill missing nodes)
-    make_tree(num, energy_barr, nodes);
+    make_tree(num, energy_barr, findpath_barr, nodes);
 
     // plot it!
     PS_tree_plot(nodes, num, args_info.barr_name_arg);
@@ -597,6 +621,7 @@ int main(int argc, char **argv)
 
   // release resources
   if (energy_barr!=NULL) free(energy_barr);
+  if (findpath_barr!=NULL) free(findpath_barr);
   if (seq!=NULL) free(seq);
   if (name!=NULL) free(name);
   cmdline_parser_free(&args_info);
