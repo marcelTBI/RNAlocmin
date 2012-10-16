@@ -293,14 +293,14 @@ int main(int argc, char **argv)
       // if not enough minima
       if (i<num) {
         // first check if the output is not shallow
-        if (!Opt.minhall && Opt.minh>0 && i<num) {
+        if (!Opt.minhall && Opt.minh>0) {
           int saddle;
           hash_entry *escape = flood(it->first, saddle, Opt.minh);
 
           // shallow
           if (escape) {
             if (args_info.verbose_lvl_arg>0) {
-              fprintf(stderr, "shallow: %s %6.2f\n", pt_to_str(it->first.structure).c_str(), it->first.energy/100.0);
+              fprintf(stderr, "shallow: %s %6.2f (saddle: %s %6.2f)\n", pt_to_str(it->first.structure).c_str(), it->first.energy/100.0, pt_to_str(escape->structure).c_str(), escape->energy/100.0);
             }
             free_entry(escape);
             free(it->first.structure);
@@ -340,6 +340,11 @@ int main(int argc, char **argv)
           output_num.erase(output_num.begin()+j);
         }
       }
+    } else {
+      output_he.resize(i);
+      output_str.resize(i);
+      output_en.resize(i);
+      output_num.resize(i);
     }
 
     // threshold for flooding
@@ -561,7 +566,7 @@ int main(int argc, char **argv)
 
   // printf output
   printf("     %s\n", seq);
-  for (int i=0; i<num; i++) {
+  for (unsigned int i=0; i<output_str.size(); i++) {
     printf("%4d %s %6.2f %6d", i+1, output_str[i].c_str(), output_en[i]/100.0, output_num[i]);
     if (args_info.bartree_flag) {
       printf(" %4d %6.2f\n", nodes[i].father+1, nodes[i].saddle_height-nodes[i].height);

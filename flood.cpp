@@ -53,7 +53,7 @@ bool flood_func(hash_entry &input)
       if (debugg) fprintf(stderr,   "       escape  : %s %.2f\n", pt_to_str(input.structure).c_str(), input.energy/100.0);
       return true;
     } else {
-      if (input.energy >= top_lvl) {
+      if (input.energy > top_lvl) {
         if (debugg) fprintf(stderr, "energy too high: %s %.2f\n", pt_to_str(input.structure).c_str(), input.energy/100.0);
         return false;
       } else {
