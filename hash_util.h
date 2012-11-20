@@ -3,6 +3,7 @@
 
 #include <unordered_map>
 #include <unordered_set>
+#include <map>
 
 extern "C" {
   #include "utils.h"
@@ -31,6 +32,16 @@ typedef struct _hash_entry {
   }
 
 } hash_entry;
+
+// help struct for hash
+struct gw_struct {
+  int count;
+  hash_entry he; // does not contain memory
+  gw_struct(){
+    he.structure = NULL;
+    count = 0;
+  }
+};
 
 #ifndef HASHBITS
 #define HASHBITS 24
@@ -153,11 +164,34 @@ struct hash_fncts2{
   }
 };
 
+// comparators for hash_lists (structure) (map and queue use different :-/ )
+struct compare_map {
+  bool operator() (const hash_entry &lhs, const hash_entry &rhs) const {
+    // first energies
+    if (lhs.energy != rhs.energy) {
+      return lhs.energy<rhs.energy;
+    }
+    // then structures (here we have structures as numbers, but we want to compare them as chars in bractet dot notation: "()." )
+    int i=1;
+    char l=0,r=0;
+    while (i<=lhs.structure[0]) {
+      l = (lhs.structure[i]==0?'.':(lhs.structure[i]<lhs.structure[lhs.structure[i]]?'(':')'));
+      r = (rhs.structure[i]==0?'.':(rhs.structure[i]<rhs.structure[rhs.structure[i]]?'(':')'));
+      if (l != r) break;
+      i++;
+    }
+    return (i<=lhs.structure[0] && l<r);
+  }
+};
+
 // print stats about hash
-void print_stats(unordered_map<hash_entry, int, hash_fncts> structs);
+void print_stats(unordered_map<hash_entry, gw_struct, hash_fncts> &structs);
+// add stats from hash to output map
+void add_stats(unordered_map<hash_entry, gw_struct, hash_fncts> &structs, map<hash_entry, int, compare_map> &output);
+
 
 // free hash
-void free_hash(unordered_map<hash_entry, int, hash_fncts> &structs);
+void free_hash(unordered_map<hash_entry, gw_struct, hash_fncts> &structs);
 void free_hash(unordered_set<hash_entry*, hash_fncts2, hash_eq> &structs);
 
 // entry handling

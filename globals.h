@@ -67,7 +67,6 @@ class Options {
   // options
 public:
   float minh;   // leave out shallow minima (should be relativelly small)
-  bool minhall; // flood during 1st phase (descend walks)
   bool noLP;    // no lone pairs
   bool EOM;     // use energy_of_move
   bool first;   // use first descent, not deepest

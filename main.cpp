@@ -29,6 +29,24 @@ extern "C" {
 
 using namespace std;
 
+inline bool isSeq(char *p)
+{
+  // check first two chars - should be enough
+  char seq[]="ACGTUactgu";
+  int ok = 0;
+  for (unsigned int i=0; i<strlen(seq); i++) {
+    if (p[0]==seq[i]) {
+      ok++;
+    }
+    if (p[1]==seq[i]) {
+      ok++;
+    }
+    if (ok==2) break;
+  }
+
+  return (ok==2);
+}
+
 inline bool isStruct(char *p)
 {
   // check first two chars - should be enough
@@ -38,149 +56,20 @@ inline bool isStruct(char *p)
 
 inline bool isEnergy(char *p, float &energy)
 {
-  if (sscanf(p, "%f", &energy) == 1 && energy<100.0 && energy >-200.0) return true;
+  if (sscanf(p, "%f", &energy) == 1) return true;
   else return false;
 }
 
-int move(unordered_map<hash_entry, int, hash_fncts> &structs, map<hash_entry, int, compare_map> &output, set<hash_entry, compare_map> &output_shallow)
+inline int en_fltoi(float en)
 {
-  // count moves
-  num_moves++;
-
-  // read a line
-  char *line = my_getline(stdin);
-  if (line == NULL) return -1;
-  if (line[0]=='>') {
-    free(line);
-    return 0;
-  }
-
-  float energy=1e10;
-
-  // process lines
-  char *p = line;
-  char *sep = " \t\n";
-  char *temp;
-
-  bool struct_found = false;
-  bool energy_found = false;
-
-  p = strtok(line, sep);
-  while(p!=NULL && !(struct_found && energy_found)) {
-    //fprintf(stderr, "%s\n", p);
-    if (isStruct(p)) {
-      if (struct_found) fprintf(stderr, "On line \"%s\" two structure-like sequences found!\n", line);
-      else {
-        temp = p;
-      }
-      struct_found = true;
-    } else {
-      if (isEnergy(p, energy)) {
-        energy_found = true;
-      }
-    }
-
-    p = strtok(NULL, sep);
-  }
-  p = temp;
-  if (!struct_found) {
-    free(line);
-    return 0;
-  }
-
-  // find length of structure
-  int len=0;
-  while (p[len]!='\0' && p[len]!=' ') len++;
-
-  if (len!=seq_len) {
-    fprintf(stderr, "Unequal lengths:\n(structure) %s\n (sequence) %s\n", p, Enc.seq);
-    free(line);
-    return -1;
-  }
-
-  // was it before?
-  hash_entry str;
-  str.structure = Enc.Struct(p);
-  free(line);
-  unordered_map<hash_entry, int, hash_fncts>::iterator it_s = structs.find(str);
-  //hash_entry *tmp_h = (hash_entry*)lookup_hash(str);
-  // if it was - release memory + get another
-  if (it_s != structs.end()) {
-    it_s->second++;
-    free(str.structure);
-    return 0;
-  } else {
-    // find energy only if not in input (not working - does energy_of_move require energy_of_struct run first???)
-    str.energy = Enc.Energy(str);
-    /*if (1 || !energy_found) str.energy = Enc.Energy(str);
-    else str.energy = (int)(energy*100.0+(energy<0.0 ? -0.5 : 0.5));*/
-
-    //if (en != str.energy) fprintf(stderr, "%d %d\n", en, str.energy);
-
-    // insert into hash
-    structs[str] = 1;
-    str.structure = allocopy(str.structure);
-  }
-
-  //is it canonical (noLP)
-  if (Opt.noLP && find_lone_pair(str.structure)!=-1) {
-    fprintf(stderr, "WARNING: structure \"%s\" has lone pairs, skipping...\n", pt_to_str(str.structure).c_str());
-    return -2;
-  }
-
-  //debugging
-  if (Opt.verbose_lvl>2) fprintf(stderr, "processing: %d %s\n", num_moves, pt_to_str(str.structure).c_str());
-
-  // descend
-  int i;
-  while ((i = (Opt.rand? move_rand(str) : move_set(str)))!=0) {
-    Deg.Clear();
-  }
-  Deg.Clear();
-
-  // discard shallow ones (check if we have them already)
-  if (Opt.minhall && Opt.minh>0 && (output.find(str) == output.end()) && (output_shallow.find(str) == output_shallow.end())) {
-
-    // flood it a little
-    int status;
-    hash_entry *escape = flood(str, status, Opt.minh);
-
-    // while not found non-shallow one
-    while (escape) {
-
-      //add to shallow set
-      if (output_shallow.find(str)!=output_shallow.end()) break;
-      output_shallow.insert(str);
-      str.structure = allocopy(str.structure);
-      if (Opt.verbose_lvl>1) fprintf(stderr, "shallow:  %s %d\n", pt_to_str(str.structure).c_str(), str.energy);
-
-      // find another minima
-      while (move_set(*escape)!=0) {
-        Deg.Clear();
-      }
-      Deg.Clear();
-
-      // try to flood again
-      hash_entry *he_tmp = flood(*escape, status, Opt.minh);
-      free_entry(escape);
-      escape = he_tmp;
-    }
-  }
-
-  if (Opt.verbose_lvl>2) fprintf(stderr, "\n  %s %d\n", pt_to_str(str.structure).c_str(), str.energy);
-
-  // save for output
-  map<hash_entry, int, compare_map>::iterator it;
-  if ((it = output.find(str)) != output.end()) {
-    it->second++;
-    free(str.structure);
-  } else {
-    str.num = output.size();
-    output.insert(make_pair(str, 1));
-  }
-
-  return 1;
+  if (en < 0.0) return (int)(en*100 - 0.5);
+  else return (int)(en*100 + 0.5);
 }
+
+// functions that are down in file ;-)
+char *read_seq(char *seq_arg, char **name_out);
+int move(unordered_map<hash_entry, gw_struct, hash_fncts> &structs, map<hash_entry, int, compare_map> &output, set<hash_entry, compare_map> &output_shallow);
+char *read_previous(char *previous, map<hash_entry, int, compare_map> &output);
 
 int main(int argc, char **argv)
 {
@@ -209,28 +98,19 @@ int main(int argc, char **argv)
     dangles = args_info.dangles_arg;
   }
 
-  // read sequence
-  FILE *fseq;
-  fseq = fopen(args_info.seq_arg, "r");
-  if (fseq == NULL) {
-    fprintf(stderr, "Cannot open file \"%s\".\n", args_info.seq_arg);
-    exit(EXIT_FAILURE);
+  // keep track of structures & statistics
+  map<hash_entry, int, compare_map> output; // structures plus energies to output (+ how many hits has this minima)
+  set<hash_entry, compare_map> output_shallow; // shallow structures (if minh specified)
+  char *seq = NULL;
+  char *name = NULL;
+
+  // read previous LM or/and sequence
+  if (args_info.previous_given) {
+    seq = read_previous(args_info.previous_arg, output);
+  } else {
+    seq = read_seq(args_info.seq_arg, &name);
   }
-  char *seq;
-  char *name =NULL;
-  name = my_getline(fseq);
-  if (name == NULL) {
-    fprintf(stderr, "File \"%s\" empty.\n", args_info.seq_arg);
-    exit(EXIT_FAILURE);
-  }
-  seq = my_getline(fseq);
-  if (seq == NULL || name[0]!='>') {
-    //fprintf(stderr, "WARNING: File \"%s\" not in FASTA format. Using it as a sequence.\n", args_info.seq_arg);
-    if (seq!=NULL) free(seq);
-    seq = name;
-    name = NULL;
-  }
-  fclose(fseq);
+
   if (args_info.verbose_lvl_arg>1) fprintf(stderr, "%s\n", seq);
 
   seq_len = strlen(seq);
@@ -242,18 +122,16 @@ int main(int argc, char **argv)
   }
 
   // ########################## main loop - reads structures from RNAsubopt and process them
-  int count = 0;  //num of local minima
+  int count = output.size();  //num of local minima
   Enc.Init(seq);
 
-  // keep track of structures & statistics
-  map<hash_entry, int, compare_map> output; // structures plus energies to output (+ how many hits has this minima)
-  set<hash_entry, compare_map> output_shallow; // shallow structures (if minh specified)
   int not_canonical = 0;
+
   // hash
-  unordered_map<hash_entry, int, hash_fncts> structs (HASHSIZE);
+  unordered_map<hash_entry, gw_struct, hash_fncts> structs (HASHSIZE);
   while (!args_info.find_num_given || count != args_info.find_num_arg) {
     int res = move(structs, output, output_shallow);
-    if (res==0)   continue;
+    if (res==0)   continue; // same structure has been processed already
     if (res==-1)  break;
     if (res==-2)  not_canonical++;
     if (res==1)   count=output.size();
@@ -262,6 +140,7 @@ int main(int argc, char **argv)
   // free hash
   //int num_of_structures = hash_size();
   if (args_info.verbose_lvl_arg>0) print_stats(structs);
+  add_stats(structs, output);
   free_hash(structs);
 
   // time?
@@ -293,7 +172,7 @@ int main(int argc, char **argv)
       // if not enough minima
       if (i<num) {
         // first check if the output is not shallow
-        if (!Opt.minhall && Opt.minh>0) {
+        if (Opt.minh>0) {
           int saddle;
           hash_entry *escape = flood(it->first, saddle, Opt.minh);
 
@@ -558,7 +437,7 @@ int main(int argc, char **argv)
     PS_tree_plot(nodes, num, args_info.barr_name_arg);
   }
 
-    // time?
+  // time?
   if (args_info.verbose_lvl_arg>0) {
     fprintf(stderr, "Rates + barrier tree generation: %.2f secs.\n", (clock() - clck1)/(double)CLOCKS_PER_SEC);
     clck1 = clock();
@@ -567,6 +446,11 @@ int main(int argc, char **argv)
   // printf output
   printf("     %s\n", seq);
   for (unsigned int i=0; i<output_str.size(); i++) {
+    if (args_info.eRange_given) {
+      if ((output_en[i] - output_en[0]) >  args_info.eRange_arg*100 ) {
+        break;
+      }
+    }
     printf("%4d %s %6.2f %6d", i+1, output_str[i].c_str(), output_en[i]/100.0, output_num[i]);
     if (args_info.bartree_flag) {
       printf(" %4d %6.2f\n", nodes[i].father+1, nodes[i].saddle_height-nodes[i].height);
@@ -641,4 +525,212 @@ int main(int argc, char **argv)
   }
 
   return 0;
+}
+
+char *read_previous(char *previous, map<hash_entry, int, compare_map> &output)
+{
+  char *seq;
+  FILE *fprev;
+  fprev = fopen(previous, "r");
+  if (fprev == NULL) {
+    fprintf(stderr, "Cannot open file \"%s\".\n", previous);
+    exit(EXIT_FAILURE);
+  }
+  char *line = my_getline(fprev);
+  char *p = strtok(line, " \t\n");
+  while (p) {
+    if (isSeq(p)) {
+      seq = (char*)malloc((strlen(p)+1)*sizeof(char));
+      strcpy(seq, p);
+      break;
+    }
+    p = strtok(NULL, " \t\n");
+  }
+  free(line);
+
+  if (seq == NULL) {
+    fprintf(stderr, "Couldn't find sequence on first line of file \"%s\"\n", previous);
+    fclose(fprev);
+    exit(EXIT_FAILURE);
+  }
+  // read previously found minima:
+  while ((line = my_getline(fprev))) {
+    p = strtok(line, " \t\n");
+
+    hash_entry he;
+    he.structure = NULL;
+    he.energy = INT_MAX;
+
+    // read the stuff
+    sscanf(p, "%d", &he.num);
+    p = strtok(NULL, " \t\n");
+    if (p && isStruct(p)) {
+      he.structure = make_pair_table(p);
+    }
+    p = strtok(NULL, " \t\n");
+    if (p && he.structure && he.energy==INT_MAX) {
+      float en;
+      if (sscanf(p, "%f", &en)==1) {
+        he.energy = en_fltoi(en);
+      }
+    }
+    p = strtok(NULL, " \t\n");
+    if (p && he.structure && he.energy!=INT_MAX) {
+      int count_lm;
+      if (sscanf(p, "%d", &count_lm)==1) {
+        output[he]=count_lm;
+      }
+    }
+    free(line);
+  }
+
+  fclose(fprev);
+  return seq;
+}
+
+char *read_seq(char *seq_arg, char **name_out)
+{
+  char *name = NULL;
+  char *seq = NULL;
+  // read sequence
+  FILE *fseq;
+  fseq = fopen(seq_arg, "r");
+  if (fseq == NULL) {
+    fprintf(stderr, "Cannot open file \"%s\".\n", seq_arg);
+    exit(EXIT_FAILURE);
+  }
+  name = my_getline(fseq);
+  if (name == NULL) {
+    fprintf(stderr, "File \"%s\" empty.\n", seq_arg);
+    fclose(fseq);
+    exit(EXIT_FAILURE);
+  }
+  seq = my_getline(fseq);
+  if (seq == NULL || name[0]!='>') {
+    //fprintf(stderr, "WARNING: File \"%s\" not in FASTA format. Using it as a sequence.\n", seq_arg);
+    if (seq!=NULL) free(seq);
+    seq = name;
+    name = NULL;
+  }
+  fclose(fseq);
+  if (name) (*name_out) = name;
+  return seq;
+}
+
+
+int move(unordered_map<hash_entry, gw_struct, hash_fncts> &structs, map<hash_entry, int, compare_map> &output, set<hash_entry, compare_map> &output_shallow)
+{
+  // count moves
+  num_moves++;
+
+  // read a line
+  char *line = my_getline(stdin);
+  if (line == NULL) return -1;
+  if (line[0]=='>') {
+    free(line);
+    return 0;
+  }
+
+  float energy=1e10;
+
+  // process lines
+  char *p = line;
+  char *sep = " \t\n";
+  char *temp;
+
+  bool struct_found = false;
+  bool energy_found = false;
+
+  p = strtok(line, sep);
+  while(p!=NULL && !(struct_found && energy_found)) {
+    //fprintf(stderr, "%s\n", p);
+    if (isStruct(p)) {
+      if (struct_found) fprintf(stderr, "WARNING: On line \"%s\" two structure-like sequences found!\n", line);
+      else {
+        temp = p;
+      }
+      struct_found = true;
+    } else {
+      if (isEnergy(p, energy)) {
+        energy_found = true;
+      }
+    }
+
+    p = strtok(NULL, sep);
+  }
+  p = temp;
+  if (!struct_found) {
+    fprintf(stderr, "WARNING: On line \"%s\" no structure-like sequences found!\n", line);
+    free(line);
+    return 0;
+  }
+
+  // find length of structure
+  int len=0;
+  while (p[len]!='\0' && p[len]!=' ') len++;
+
+  if (len!=seq_len) {
+    fprintf(stderr, "Unequal lengths:\n(structure) %s\n (sequence) %s\n", p, Enc.seq);
+    free(line);
+    return -1;
+  }
+
+  // was it before?
+  hash_entry str;
+  str.structure = Enc.Struct(p);
+  free(line);
+  unordered_map<hash_entry, gw_struct, hash_fncts>::iterator it_s = structs.find(str);
+  //hash_entry *tmp_h = (hash_entry*)lookup_hash(str);
+  // if it was - release memory + get another
+  if (it_s != structs.end()) {
+    it_s->second.count++;
+    free(str.structure);
+    return 0;
+  } else {
+    // find energy only if not in input (not working - does energy_of_move require energy_of_struct run first???)
+    str.energy = Enc.Energy(str);
+    /*if (1 || !energy_found) str.energy = Enc.Energy(str);
+    else str.energy = (int)(energy*100.0+(energy<0.0 ? -0.5 : 0.5));*/
+
+    //if (en != str.energy) fprintf(stderr, "%d %d\n", en, str.energy);
+
+    // insert into hash
+    gw_struct &gw = structs[str];
+    gw.count = 1;
+
+    //is it canonical (noLP)
+    if (Opt.noLP && find_lone_pair(str.structure)!=-1) {
+      fprintf(stderr, "WARNING: structure \"%s\" has lone pairs, skipping...\n", pt_to_str(str.structure).c_str());
+      return -2;
+    }
+
+    // copy it anew
+    str.structure = allocopy(str.structure);
+
+    //debugging
+    if (Opt.verbose_lvl>2) fprintf(stderr, "processing: %d %s\n", num_moves, pt_to_str(str.structure).c_str());
+
+    // descend
+    int i;
+    while ((i = (Opt.rand? move_rand(str) : move_set(str)))!=0) {
+      Deg.Clear();
+    }
+    Deg.Clear();
+
+    if (Opt.verbose_lvl>2) fprintf(stderr, "\n  %s %d\n", pt_to_str(str.structure).c_str(), str.energy);
+
+    // save for output
+    map<hash_entry, int, compare_map>::iterator it;
+    if ((it = output.find(str)) != output.end()) {
+      it->second++;
+      gw.he = it->first;
+      free(str.structure);
+    } else {
+      gw.he = str;
+      str.num = output.size();
+      output.insert(make_pair(str, 1));
+    }
+  }
+
+  return 1;
 }

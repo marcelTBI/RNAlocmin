@@ -35,16 +35,16 @@ void free_entry(hash_entry *he)
   free(he);
 }
 
-void print_stats(unordered_map<hash_entry, int, hash_fncts> structs)
+void print_stats(unordered_map<hash_entry, gw_struct, hash_fncts> &structs)
 {
   double mean = 0.0;
   int count = 0;
   double entropy = 0.0;
-  unordered_map<hash_entry, int, hash_fncts>::iterator it;
+  unordered_map<hash_entry, gw_struct, hash_fncts>::iterator it;
   for (it=structs.begin(); it!=structs.end(); it++) {
-    count += it->second;
-    mean += (it->first.energy)*(it->second);
-    entropy += it->second*log(it->second);
+    count += it->second.count;
+    mean += (it->first.energy)*(it->second.count);
+    entropy += it->second.count*log(it->second.count);
   }
 
   mean /= (double)count*100.0;
@@ -53,11 +53,27 @@ void print_stats(unordered_map<hash_entry, int, hash_fncts> structs)
   fprintf(stderr, "Mean  : %.3f\n"
                   "Entrpy: %.3f\n", mean, entropy);
 }
+//#include "move_set.h"
+
+void add_stats(unordered_map<hash_entry, gw_struct, hash_fncts> &structs, map<hash_entry, int, compare_map> &output)
+{
+  unordered_map<hash_entry, gw_struct, hash_fncts>::iterator it;
+  for (it=structs.begin(); it!=structs.end(); it++) {
+    // add stats:
+    //fprintf(stderr, "struct: %s %6.2f %d\n", pt_to_str(it->second.he.structure).c_str(), it->second.he.energy/100.0, it->second.count);
+
+    if (output.count(it->second.he) == 0) {
+      fprintf(stderr, "ERROR: output does not contain structure it should!!!\n");
+      exit(EXIT_FAILURE);
+    }
+    output[it->second.he] += it->second.count-1;
+  }
+}
 
 // free hash
-void free_hash(unordered_map<hash_entry, int, hash_fncts> &structs)
+void free_hash(unordered_map<hash_entry, gw_struct, hash_fncts> &structs)
 {
-  unordered_map<hash_entry, int, hash_fncts>::iterator it;
+  unordered_map<hash_entry, gw_struct, hash_fncts>::iterator it;
   for (it=structs.begin(); it!=structs.end(); it++) {
     free(it->first.structure);
   }

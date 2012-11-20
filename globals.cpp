@@ -228,6 +228,11 @@ int Options::Init(gengetopt_args_info &args_info)
     ret = -1;
   }
 
+  if (args_info.eRange_given && args_info.eRange_arg<0.0) {
+    fprintf(stderr, "Energy range should be non-negative number\n");
+    ret = -1;
+  }
+
   if (args_info.dangles_arg<0 || args_info.dangles_arg>3) {
     fprintf(stderr, "Dangle treatment constant should be 0, 1, 2, or 3\n");
     ret = -1;
@@ -237,7 +242,6 @@ int Options::Init(gengetopt_args_info &args_info)
 
   // adjust options
   minh = (int)(args_info.minh_arg*100);
-  minhall = args_info.minhall_flag;
   noLP = args_info.noLP_flag;
   EOM = !args_info.useEOS_flag;
   first = args_info.walk_arg[0]=='F';
