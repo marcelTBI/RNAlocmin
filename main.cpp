@@ -121,7 +121,7 @@ int main(int argc, char **argv)
     clck1 = clock();
   }
 
-  // ########################## main loop - reads structures from RNAsubopt and process them
+  // ########################## begin main loop - reads structures from RNAsubopt and process them
   int count = output.size();  //num of local minima
   Enc.Init(seq);
 
@@ -136,6 +136,8 @@ int main(int argc, char **argv)
     if (res==-2)  not_canonical++;
     if (res==1)   count=output.size();
   }
+
+  // ########################## end main loop - reads structures from RNAsubopt and process them
 
   // free hash
   //int num_of_structures = hash_size();
@@ -245,8 +247,8 @@ int main(int argc, char **argv)
   bool *findpath_barr = NULL;
 
   // find saddles - fill energy barriers
-  nodeT nodes[num];
   if (args_info.rates_flag || args_info.bartree_flag) {
+    nodeT nodes[num];
     energy_barr = (float*) malloc(num*num*sizeof(float));
     for (int i=0; i<num*num; i++) energy_barr[i]=1e10;
     findpath_barr = (bool*) malloc(num*num*sizeof(bool));
@@ -418,43 +420,54 @@ int main(int argc, char **argv)
       fprintf(stderr, "Findpath(%d/%d): %.2f secs.\n", findpath, num*(num-1)/2, (clock() - clck1)/(double)CLOCKS_PER_SEC);
       clck1 = clock();
     }
-  }
 
-  // create rates for treekin
-  if (args_info.rates_flag) {
-    print_rates(args_info.rates_file_arg, args_info.temp_arg, num, energy_barr, output_en);
-  }
-
-  // generate barrier tree?
-  if (args_info.bartree_flag) {
-
-    //PS_tree_plot(nodes, num, "tst.ps");
-
-    // make tree (fill missing nodes)
-    make_tree(num, energy_barr, findpath_barr, nodes);
-
-    // plot it!
-    PS_tree_plot(nodes, num, args_info.barr_name_arg);
-  }
-
-  // time?
-  if (args_info.verbose_lvl_arg>0) {
-    fprintf(stderr, "Rates + barrier tree generation: %.2f secs.\n", (clock() - clck1)/(double)CLOCKS_PER_SEC);
-    clck1 = clock();
-  }
-
-  // printf output
-  printf("     %s\n", seq);
-  for (unsigned int i=0; i<output_str.size(); i++) {
-    if (args_info.eRange_given) {
-      if ((output_en[i] - output_en[0]) >  args_info.eRange_arg*100 ) {
-        break;
-      }
+    // create rates for treekin
+    if (args_info.rates_flag) {
+      print_rates(args_info.rates_file_arg, args_info.temp_arg, num, energy_barr, output_en);
     }
-    printf("%4d %s %6.2f %6d", i+1, output_str[i].c_str(), output_en[i]/100.0, output_num[i]);
+
+    // generate barrier tree?
     if (args_info.bartree_flag) {
+
+      //PS_tree_plot(nodes, num, "tst.ps");
+
+      // make tree (fill missing nodes)
+      make_tree(num, energy_barr, findpath_barr, nodes);
+
+      // plot it!
+      PS_tree_plot(nodes, num, args_info.barr_name_arg);
+    }
+
+    // time?
+    if (args_info.verbose_lvl_arg>0) {
+      fprintf(stderr, "Rates + barrier tree generation: %.2f secs.\n", (clock() - clck1)/(double)CLOCKS_PER_SEC);
+      clck1 = clock();
+    }
+
+    // printf output with fathers!
+    printf("     %s\n", seq);
+    for (unsigned int i=0; i<output_str.size(); i++) {
+      if (args_info.eRange_given) {
+        if ((output_en[i] - output_en[0]) >  args_info.eRange_arg*100 ) {
+          break;
+        }
+      }
+      printf("%4d %s %6.2f %6d", i+1, output_str[i].c_str(), output_en[i]/100.0, output_num[i]);
       printf(" %4d %6.2f\n", nodes[i].father+1, nodes[i].saddle_height-nodes[i].height);
-    } else printf("\n");
+    }
+  } else {
+
+    // printf output without fathers!
+    printf("     %s\n", seq);
+    for (unsigned int i=0; i<output_str.size(); i++) {
+      if (args_info.eRange_given) {
+        if ((output_en[i] - output_en[0]) >  args_info.eRange_arg*100 ) {
+          break;
+        }
+      }
+      printf("%4d %s %6.2f %6d", i+1, output_str[i].c_str(), output_en[i]/100.0, output_num[i]);
+      printf("\n");
+    }
   }
 
   // Jing's visualisation
