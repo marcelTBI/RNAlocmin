@@ -13,7 +13,7 @@ args "--file-name=RNAlocmin_cmdline --include-getopt --default-optional --unamed
 # Options
 section "General options"
 option "seq"                s "Sequence file in FASTA format" string default="seq.txt"
-option "previous"           p "Previously found LM (output from RNAlocmin), if specified does not need seq option" string no
+option "previous"           p "Previously found LM (output from RNAlocmin), if specified does not need --seq option" string no
 option "move"               m "Move set:\nI ==> insertion & deletion of base pair\nS ==> I&D& switch base pair" values="I","S" default="I" no
 option "min-num"            n "Maximal number of local minima returned\n(0 == unlimited)" int default="100" no
 option "find-num"           - "Maximal number of local minima found\n(default = unlimited - crawl through whole file)" int no
@@ -35,6 +35,7 @@ details="\nWith -d1 only unpaired bases can participate in at most one dangling 
  and works only for mfe folding.\n\nNote that by default (as well as with -d1 and -d3) pf and mfe folding\
  treat dangling ends differently. Use -d2 in addition to -p to ensure that both algorithms use the same\
  energy model.\n\n" int default="2" optional
+option "fix-barriers"       - "Fix barrier file for interior loops (just recompute if all LM in barrier output are LM), if specified, does not need neither --previous nor --seq option" string no hidden
 
 section "Misc"
 option "numIntervals"       - "Number of intervals for Jing's visualisation" int default="0" no

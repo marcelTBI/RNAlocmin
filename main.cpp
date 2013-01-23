@@ -66,10 +66,30 @@ inline int en_fltoi(float en)
   else return (int)(en*100 + 0.5);
 }
 
+struct barr_info { // info taken from barriers
+  int father;
+  int e_diff;
+  int bsize;
+  int fbsize;
+  // unused, unmodified
+  float fen;
+  int grad;
+  float feng;
+
+  barr_info &operator+(barr_info &second) {
+    bsize += second.bsize;
+    if (second.father!=father) father = -1;
+    fbsize += second.fbsize;
+    grad += second.grad;
+    return *this;
+  }
+};
+
 // functions that are down in file ;-)
 char *read_seq(char *seq_arg, char **name_out);
 int move(unordered_map<hash_entry, gw_struct, hash_fncts> &structs, map<hash_entry, int, compare_map> &output, set<hash_entry, compare_map> &output_shallow);
 char *read_previous(char *previous, map<hash_entry, int, compare_map> &output);
+char *read_barr(char *previous, map<hash_entry, barr_info, compare_map> &output);
 
 int main(int argc, char **argv)
 {
@@ -100,15 +120,20 @@ int main(int argc, char **argv)
 
   // keep track of structures & statistics
   map<hash_entry, int, compare_map> output; // structures plus energies to output (+ how many hits has this minima)
+  map<hash_entry, barr_info, compare_map> output_barr; // structures plus energies to output (+ barr_info)
   set<hash_entry, compare_map> output_shallow; // shallow structures (if minh specified)
   char *seq = NULL;
   char *name = NULL;
 
   // read previous LM or/and sequence
-  if (args_info.previous_given) {
-    seq = read_previous(args_info.previous_arg, output);
+  if (args_info.fix_barriers_given) {
+    seq = read_barr(args_info.fix_barriers_arg, output_barr);
   } else {
-    seq = read_seq(args_info.seq_arg, &name);
+    if (args_info.previous_given) {
+      seq = read_previous(args_info.previous_arg, output);
+    } else {
+      seq = read_seq(args_info.seq_arg, &name);
+    }
   }
 
   if (args_info.verbose_lvl_arg>1) fprintf(stderr, "%s\n", seq);
@@ -122,53 +147,53 @@ int main(int argc, char **argv)
   }
 
   // ########################## begin main loop - reads structures from RNAsubopt and process them
-  int count = output.size();  //num of local minima
+  int count = max(output.size(), output_barr.size());  //num of local minima
   Enc.Init(seq);
 
   int not_canonical = 0;
 
-  // hash
-  unordered_map<hash_entry, gw_struct, hash_fncts> structs (HASHSIZE);
-  while (!args_info.find_num_given || count != args_info.find_num_arg) {
-    int res = move(structs, output, output_shallow);
-    if (res==0)   continue; // same structure has been processed already
-    if (res==-1)  break;
-    if (res==-2)  not_canonical++;
-    if (res==1)   count=output.size();
-  }
+  if (!args_info.fix_barriers_given) {
+    // hash
+    unordered_map<hash_entry, gw_struct, hash_fncts> structs (HASHSIZE);
+    while (!args_info.find_num_given || count != args_info.find_num_arg) {
+      int res = move(structs, output, output_shallow);
+      if (res==0)   continue; // same structure has been processed already
+      if (res==-1)  break;
+      if (res==-2)  not_canonical++;
+      if (res==1)   count=output.size();
+    }
 
-  // ########################## end main loop - reads structures from RNAsubopt and process them
 
-  // free hash
-  //int num_of_structures = hash_size();
-  if (args_info.verbose_lvl_arg>0) print_stats(structs);
-  add_stats(structs, output);
-  free_hash(structs);
+    // ########################## end main loop - reads structures from RNAsubopt and process them
 
-  // time?
-  if (args_info.verbose_lvl_arg>0) {
-    fprintf(stderr, "Main loop (deepest descent from RNAsubopt): %.2f secs.\n", (clock() - clck1)/(double)CLOCKS_PER_SEC);
-    clck1 = clock();
-  }
+    // free hash
+    //int num_of_structures = hash_size();
+    if (args_info.verbose_lvl_arg>0) print_stats(structs);
+    add_stats(structs, output);
+    free_hash(structs);
 
-  // vectors for rates computation
-  int num = ((count > args_info.min_num_arg && args_info.min_num_arg!=0) ? args_info.min_num_arg : count);
-  vector<string> output_str;
-  output_str.resize(num);
-  vector<hash_entry> output_he;
-  hash_entry h;
-  h.structure = NULL;
-  output_he.resize(num, h);
-  vector<int> output_en;
-  output_en.resize(num);
-  vector<int> output_num;
-  output_num.resize(num);
+    // time?
+    if (args_info.verbose_lvl_arg>0) {
+      fprintf(stderr, "Main loop (deepest descent from RNAsubopt): %.2f secs.\n", (clock() - clck1)/(double)CLOCKS_PER_SEC);
+      clck1 = clock();
+    }
 
-  // threshold for flooding
-  int threshold;
+    // vectors for rates computation
+    int num = ((count > args_info.min_num_arg && args_info.min_num_arg!=0) ? args_info.min_num_arg : count);
+    vector<string> output_str;
+    output_str.resize(num);
+    vector<hash_entry> output_he;
+    hash_entry h;
+    h.structure = NULL;
+    output_he.resize(num, h);
+    vector<int> output_en;
+    output_en.resize(num);
+    vector<int> output_num;
+    output_num.resize(num);
 
-  // insert structures into vectors (insert only <num> minima)
-  {
+    // threshold for flooding
+    int threshold;
+
     int i=0;
     for (map<hash_entry, int, compare_map>::iterator it=output.begin(); it!=output.end(); it++) {
       // if not enough minima
@@ -199,6 +224,7 @@ int main(int argc, char **argv)
             i++;
           }
         } else {
+          if (args_info.verbose_lvl_arg > 2) fprintf(stderr, "%4d %s %6.2f\n", i, pt_to_str(it->first.structure).c_str(), it->first.energy/100.0);
           output_str[i]=pt_to_str(it->first.structure);
           output_num[i]=it->second;
           output_he[i]=it->first;
@@ -234,302 +260,224 @@ int main(int argc, char **argv)
     int thr = num*args_info.floodPortion_arg;
     thr--;
     threshold = (thr<0 ? 0 : tmp[thr]);
-  }
 
-    // time?
-  if (args_info.verbose_lvl_arg>0) {
-    fprintf(stderr, "Discarding shallow minima: %.2f secs.\n", (clock() - clck1)/(double)CLOCKS_PER_SEC);
-    clck1 = clock();
-  }
-
-  // array of energy barriers
-  float *energy_barr = NULL;
-  bool *findpath_barr = NULL;
-
-  // find saddles - fill energy barriers
-  if (args_info.rates_flag || args_info.bartree_flag) {
-    nodeT nodes[num];
-    energy_barr = (float*) malloc(num*num*sizeof(float));
-    for (int i=0; i<num*num; i++) energy_barr[i]=1e10;
-    findpath_barr = (bool*) malloc(num*num*sizeof(bool));
-    for (int i=0; i<num*num; i++) findpath_barr[i]=false;
-
-    // fill nodes
-    for (int i=0; i<num; i++) {
-      nodes[i].father = -1;
-      nodes[i].height = output_en[i]/100.0;
-      nodes[i].label = NULL;
-      nodes[i].color = 0.0;
-      nodes[i].saddle_height = 1e10;
-    }
-
-    int flooded = 0;
-    // init union-findset
-    init_union(num);
-    // first try to flood the highest bins
-    for (int i=num-1; i>=0; i--) {
-      // flood only if low number of walks ended there
-      if (output_num[i]<=threshold) {
-        //copy_arr(Enc.pt, output_he[i].structure);
-        if (args_info.verbose_lvl_arg>2) fprintf(stderr,   "flooding  (%3d): %s %.2f\n", i, output_str[i].c_str(), output_he[i].energy/100.0);
-
-        int saddle;
-        hash_entry *he = flood(output_he[i], saddle);
-
-        // print info
-        if (args_info.verbose_lvl_arg>1) {
-          if (he) {
-            fprintf(stderr, "below     (%3d): %s %.2f\n"
-                            "en: %7.2f  is: %s %.2f\n", i,
-                    output_str[i].c_str(), output_he[i].energy/100.0, saddle/100.0,
-                    pt_to_str(he->structure).c_str(), he->energy/100.0);
-          } else {
-            fprintf(stderr, "unsucesful(%3d): %s %.2f\n", i,
-                    output_str[i].c_str(), output_he[i].energy/100.0);
-          }
-        }
-        // if flood succesfull - walk down to find father minima
-        if (he) {
-          // walk down
-          while (move_set(*he)!=0) {
-            Deg.Clear();
-          };
-          Deg.Clear();
-
-          // now check if we have the minimum already (hopefuly yes ;-) )
-          vector<hash_entry>::iterator it;
-          it = lower_bound(output_he.begin(), output_he.end(), *he, compare_vect);
-
-          if (args_info.verbose_lvl_arg>1) fprintf(stderr, "minimum: %s %.2f\n", pt_to_str(he->structure).c_str(), he->energy/100.0);
-          // we dont need it again
-          free_entry(he);
-
-          if (it!=output_he.end()) {
-            int pos = (int)(it-output_he.begin());
-            if (args_info.verbose_lvl_arg>1) fprintf(stderr, "found father at pos: %d\n", pos);
-
-            // which one is father?
-            /*bool i_father = compare_vect(output_he[i], output_he[pos]); // is found minima higher in energy than flooded min?
-            int father = (i_father ? i:pos);
-            int child = (i_father ? pos:i);*/
-
-            /*nodes[i].saddle_height = saddle/100.0; // this is always true
-            // if we change father of pos - change also its saddle_height
-            if (i_father && (nodes[pos].father==-1 || nodes[pos].father>i)) nodes[pos].saddle_height = saddle/100.0;
-            //nodes[i].color = 0.5;
-
-            // some father issues
-            int chng_child, chng_father;
-            if (nodes[child].father == -1 || nodes[child].father == father) {
-              chng_child = child;
-              chng_father = father;
-            } else { // going to change a father (must be sure we are doing it right)
-              int old_father = nodes[child].father;
-              if (nodes[old_father].height > nodes[father].height) {
-                chng_child = old_father;
-                chng_father = father;
-              } else {
-                chng_child = father;
-                chng_father = old_father;
-              }
-            }
-
-            // add new one and recompute existing fathers
-            if (nodes[chng_child].father != father) {
-              add_father(nodes, chng_child, chng_father, 0.0);
-            }*/
-
-            flooded++;
-            energy_barr[i*num+pos] = energy_barr[pos*num+i] = saddle/100.0;
-
-            // union set
-            //fprintf(stderr, "join: %d %d\n", min(i, pos), max(i, pos));
-            union_set(min(i, pos), max(i, pos));
-          }
-        }
-      }
-    }
-
-    // time?
+      // time?
     if (args_info.verbose_lvl_arg>0) {
-      fprintf(stderr, "Flood(%d(%d)/%d): %.2f secs.\n", flooded, (int)(num*args_info.floodPortion_arg), num, (clock() - clck1)/(double)CLOCKS_PER_SEC);
+      fprintf(stderr, "Discarding shallow minima: %.2f secs.\n", (clock() - clck1)/(double)CLOCKS_PER_SEC);
       clck1 = clock();
     }
 
-    // for others, just do findpath
-    int findpath = 0;
-    set<int> to_findpath;
-    for (int i=0; i<num; i++) to_findpath.insert(find(i));
+    // array of energy barriers
+    float *energy_barr = NULL;
+    bool *findpath_barr = NULL;
 
-    if (args_info.verbose_lvl_arg>1) {
-      fprintf(stderr, "Minima left to findpath (their father = -1): ");
-      for (set<int>::iterator it=to_findpath.begin(); it!=to_findpath.end(); it++) {
-        fprintf(stderr, "%d ", *it);
+    // find saddles - fill energy barriers
+    if (args_info.rates_flag || args_info.bartree_flag) {
+      nodeT nodes[num];
+      energy_barr = (float*) malloc(num*num*sizeof(float));
+      for (int i=0; i<num*num; i++) energy_barr[i]=1e10;
+      findpath_barr = (bool*) malloc(num*num*sizeof(bool));
+      for (int i=0; i<num*num; i++) findpath_barr[i]=false;
+
+      // fill nodes
+      for (int i=0; i<num; i++) {
+        nodes[i].father = -1;
+        nodes[i].height = output_en[i]/100.0;
+        nodes[i].label = NULL;
+        nodes[i].color = 0.0;
+        nodes[i].saddle_height = 1e10;
       }
-      fprintf(stderr, "\n");
-    }
 
-    // findpath:
-    for (set<int>::iterator it=to_findpath.begin(); it!=to_findpath.end(); it++) {
-      set<int>::iterator it2=it;
-      it2++;
-      for (; it2!=to_findpath.end(); it2++) {
-        energy_barr[(*it2)*num+(*it)] = energy_barr[(*it)*num+(*it2)] = find_saddle(seq, output_str[*it].c_str(), output_str[*it2].c_str(), args_info.depth_arg)/100.0;
-        findpath_barr[(*it2)*num+(*it)] = findpath_barr[(*it)*num+(*it2)] = true;
-        findpath++;
-      }
-    }
+      int flooded = 0;
+      // init union-findset
+      init_union(num);
+      // first try to flood the highest bins
+      for (int i=num-1; i>=0; i--) {
+        // flood only if low number of walks ended there
+        if (output_num[i]<=threshold) {
+          //copy_arr(Enc.pt, output_he[i].structure);
+          if (args_info.verbose_lvl_arg>2) fprintf(stderr,   "flooding  (%3d): %s %.2f\n", i, output_str[i].c_str(), output_he[i].energy/100.0);
 
-    /*for (int i=0; i<num; i++) {
-      if (nodes[i].father != -1) continue;
+          int saddle;
+          hash_entry *he = flood(output_he[i], saddle);
 
-      for (int j=0; j<num; j++) {
+          // print info
+          if (args_info.verbose_lvl_arg>1) {
+            if (he) {
+              fprintf(stderr, "below     (%3d): %s %.2f\n"
+                              "en: %7.2f  is: %s %.2f\n", i,
+                      output_str[i].c_str(), output_he[i].energy/100.0, saddle/100.0,
+                      pt_to_str(he->structure).c_str(), he->energy/100.0);
+            } else {
+              fprintf(stderr, "unsucesful(%3d): %s %.2f\n", i,
+                      output_str[i].c_str(), output_he[i].energy/100.0);
+            }
+          }
+          // if flood succesfull - walk down to find father minima
+          if (he) {
+            // walk down
+            while (move_set(*he)!=0) {
+              Deg.Clear();
+            };
+            Deg.Clear();
 
-        // check if we already
-        if (energy_barr[i*num+j]<1e9) continue;
-        if (nodes[j].father!=-1) continue;
+            // now check if we have the minimum already (hopefuly yes ;-) )
+            vector<hash_entry>::iterator it;
+            it = lower_bound(output_he.begin(), output_he.end(), *he, compare_vect);
 
-        if (i>j) {
-          energy_barr[i*num+j] = energy_barr[j*num+i]; // assume symetry
-        } else if (i==j) {
-          energy_barr[i*num+j] = 0.0;
-        } else {
-          // find (maybe suboptimal) saddle energy
-          energy_barr[i*num+j] = find_saddle(seq, output_str[i].c_str(), output_str[j].c_str(), args_info.depth_arg)/100.0;
-          findpath++;
+            if (args_info.verbose_lvl_arg>1) fprintf(stderr, "minimum: %s %.2f\n", pt_to_str(he->structure).c_str(), he->energy/100.0);
+            // we dont need it again
+            free_entry(he);
+
+            if (it!=output_he.end()) {
+              int pos = (int)(it-output_he.begin());
+              if (args_info.verbose_lvl_arg>1) fprintf(stderr, "found father at pos: %d\n", pos);
+
+              flooded++;
+              energy_barr[i*num+pos] = energy_barr[pos*num+i] = saddle/100.0;
+
+              // union set
+              //fprintf(stderr, "join: %d %d\n", min(i, pos), max(i, pos));
+              union_set(min(i, pos), max(i, pos));
+            }
+          }
         }
       }
-    }*/
-    // debug output
-    if (args_info.verbose_lvl_arg>2) {
-      fprintf(stderr, "Energy barriers:\n");
-      //bool symmetric = true;
-      for (int i=0; i<num; i++) {
-        for (int j=0; j<num; j++) {
-          fprintf(stderr, "%8.2g%c ", energy_barr[i*num+j], (findpath_barr[i*num+j]?'~':' '));
-          //if (energy_barr[i*num+j] != energy_barr[j*num+i]) symmetric = false;
+
+      // time?
+      if (args_info.verbose_lvl_arg>0) {
+        fprintf(stderr, "Flood(%d(%d)/%d): %.2f secs.\n", flooded, (int)(num*args_info.floodPortion_arg), num, (clock() - clck1)/(double)CLOCKS_PER_SEC);
+        clck1 = clock();
+      }
+
+      // for others, just do findpath
+      int findpath = 0;
+      set<int> to_findpath;
+      for (int i=0; i<num; i++) to_findpath.insert(find(i));
+
+      if (args_info.verbose_lvl_arg>1) {
+        fprintf(stderr, "Minima left to findpath (their father = -1): ");
+        for (set<int>::iterator it=to_findpath.begin(); it!=to_findpath.end(); it++) {
+          fprintf(stderr, "%d ", *it);
         }
         fprintf(stderr, "\n");
       }
-      fprintf(stderr, "\n");
-      //fprintf(stderr, "%s", (symmetric? "":"non-symmetric energy barriers!!\n"));
-    }
 
-    // time?
-    if (args_info.verbose_lvl_arg>0) {
-      fprintf(stderr, "Findpath(%d/%d): %.2f secs.\n", findpath, num*(num-1)/2, (clock() - clck1)/(double)CLOCKS_PER_SEC);
-      clck1 = clock();
-    }
-
-    // create rates for treekin
-    if (args_info.rates_flag) {
-      print_rates(args_info.rates_file_arg, args_info.temp_arg, num, energy_barr, output_en);
-    }
-
-    // generate barrier tree?
-    if (args_info.bartree_flag) {
-
-      //PS_tree_plot(nodes, num, "tst.ps");
-
-      // make tree (fill missing nodes)
-      make_tree(num, energy_barr, findpath_barr, nodes);
-
-      // plot it!
-      PS_tree_plot(nodes, num, args_info.barr_name_arg);
-    }
-
-    // time?
-    if (args_info.verbose_lvl_arg>0) {
-      fprintf(stderr, "Rates + barrier tree generation: %.2f secs.\n", (clock() - clck1)/(double)CLOCKS_PER_SEC);
-      clck1 = clock();
-    }
-
-    // printf output with fathers!
-    printf("     %s\n", seq);
-    for (unsigned int i=0; i<output_str.size(); i++) {
-      if (args_info.eRange_given) {
-        if ((output_en[i] - output_en[0]) >  args_info.eRange_arg*100 ) {
-          break;
+      // findpath:
+      for (set<int>::iterator it=to_findpath.begin(); it!=to_findpath.end(); it++) {
+        set<int>::iterator it2=it;
+        it2++;
+        for (; it2!=to_findpath.end(); it2++) {
+          energy_barr[(*it2)*num+(*it)] = energy_barr[(*it)*num+(*it2)] = find_saddle(seq, output_str[*it].c_str(), output_str[*it2].c_str(), args_info.depth_arg)/100.0;
+          findpath_barr[(*it2)*num+(*it)] = findpath_barr[(*it)*num+(*it2)] = true;
+          if (args_info.verbose_lvl_arg>0 && findpath %10000==0){
+            fprintf(stderr, "Findpath:%7d/%7d\n", findpath, (int)(to_findpath.size()*(to_findpath.size()-1)/2));
+          }
+          findpath++;
         }
       }
-      printf("%4d %s %6.2f %6d", i+1, output_str[i].c_str(), output_en[i]/100.0, output_num[i]);
-      printf(" %4d %6.2f\n", nodes[i].father+1, nodes[i].saddle_height-nodes[i].height);
-    }
-  } else {
 
-    // printf output without fathers!
-    printf("     %s\n", seq);
-    for (unsigned int i=0; i<output_str.size(); i++) {
-      if (args_info.eRange_given) {
-        if ((output_en[i] - output_en[0]) >  args_info.eRange_arg*100 ) {
-          break;
+      // debug output
+      if (args_info.verbose_lvl_arg>2) {
+        fprintf(stderr, "Energy barriers:\n");
+        //bool symmetric = true;
+        for (int i=0; i<num; i++) {
+          for (int j=0; j<num; j++) {
+            fprintf(stderr, "%8.2g%c ", energy_barr[i*num+j], (findpath_barr[i*num+j]?'~':' '));
+            //if (energy_barr[i*num+j] != energy_barr[j*num+i]) symmetric = false;
+          }
+          fprintf(stderr, "\n");
         }
+        fprintf(stderr, "\n");
+        //fprintf(stderr, "%s", (symmetric? "":"non-symmetric energy barriers!!\n"));
       }
-      printf("%4d %s %6.2f %6d", i+1, output_str[i].c_str(), output_en[i]/100.0, output_num[i]);
-      printf("\n");
-    }
-  }
 
-  // Jing's visualisation
-  if (args_info.numIntervals_arg>0) {
-    // whole range of our minima
-    int range = output_en[num-1] - output_en[0];
-    float dE = range/(float)args_info.numIntervals_arg;
-
-    int max_samples = 0;
-    for (int i=0; i<num; i++) {
-      if (output_num[i]>max_samples) max_samples = output_num[i];
-    }
-
-    // function f(i,j)
-    int visual[args_info.numIntervals_arg][max_samples];
-    for (int i=0; i<max_samples; i++) {
-      for (int j=0; j<args_info.numIntervals_arg; j++) {
-        visual[j][i]=0;
+      // time?
+      if (args_info.verbose_lvl_arg>0) {
+        fprintf(stderr, "Findpath(%d/%d): %.2f secs.\n", findpath, num*(num-1)/2, (clock() - clck1)/(double)CLOCKS_PER_SEC);
+        clck1 = clock();
       }
-    }
-    // fill the array
-    int curr_en = 0;
-    for (int i=0; i<num; i++) {
-      float curr_range = (float)(output_en[i]-output_en[0]);
-      while (curr_range>(curr_en+1)*dE) curr_en++;
-      visual[curr_en][output_num[i]-1]++;
-    }
 
-    FILE *file;
-    char filename[] = "visuals.txt";
-    file = fopen(filename, "w");
-    if (file == NULL) {
-      fprintf(stderr, "Cannot open file \"%s\"\n", filename);
+      // create rates for treekin
+      if (args_info.rates_flag) {
+        print_rates(args_info.rates_file_arg, args_info.temp_arg, num, energy_barr, output_en);
+      }
+
+      // generate barrier tree?
+      if (args_info.bartree_flag) {
+
+        //PS_tree_plot(nodes, num, "tst.ps");
+
+        // make tree (fill missing nodes)
+        make_tree(num, energy_barr, findpath_barr, nodes);
+
+        // plot it!
+        PS_tree_plot(nodes, num, args_info.barr_name_arg);
+      }
+
+      // time?
+      if (args_info.verbose_lvl_arg>0) {
+        fprintf(stderr, "Rates + barrier tree generation: %.2f secs.\n", (clock() - clck1)/(double)CLOCKS_PER_SEC);
+        clck1 = clock();
+      }
+
+      // printf output with fathers!
+      printf("     %s\n", seq);
+      for (unsigned int i=0; i<output_str.size(); i++) {
+        if (args_info.eRange_given) {
+          if ((output_en[i] - output_en[0]) >  args_info.eRange_arg*100 ) {
+            break;
+          }
+        }
+        printf("%4d %s %6.2f", i+1, output_str[i].c_str(), output_en[i]/100.0);
+        printf(" %4d %6.2f %6d\n", nodes[i].father+1, nodes[i].saddle_height-nodes[i].height, output_num[i]);
+      }
+
+      // release smth
+      for(unsigned int i=0; i<output_he.size(); i++) {
+        free(output_he[i].structure);
+      }
     } else {
 
-      // header
-      fprintf(file, " #samp " );
-      for (int j=0; j<args_info.numIntervals_arg; j++) fprintf(file, "%6.1f", (output_en[0]+(j+1)*dE)/100.0);
-      fprintf(file, "\n\n");
-
-      // data
-      for (int i=0; i<max_samples; i++) {
-        fprintf(file, "%6d", i+1);
-        for (int j=0; j<args_info.numIntervals_arg; j++) {
-          fprintf(file, "%6d", visual[j][i]);
+      // printf output without fathers!
+      printf("     %s\n", seq);
+      for (unsigned int i=0; i<output_str.size(); i++) {
+        if (args_info.eRange_given) {
+          if ((output_en[i] - output_en[0]) >  args_info.eRange_arg*100 ) {
+            break;
+          }
         }
-        fprintf(file, "\n");
+        printf("%4d %s %6.2f %6d", i+1, output_str[i].c_str(), output_en[i]/100.0, output_num[i]);
+        printf("\n");
       }
-      fclose(file);
+    }
+
+    // release res:
+    if (energy_barr!=NULL) free(energy_barr);
+    if (findpath_barr!=NULL) free(findpath_barr);
+
+  } else { // fix-barrier part (just print output):
+    int mfe = output_barr.begin()->first.energy;
+    printf("     %s\n", seq);
+    int i=1;
+    for (map<hash_entry, barr_info, compare_map>::iterator it=output_barr.begin(); it!=output_barr.end(); it++) {
+      if (args_info.eRange_given) {
+        if ((it->first.energy - mfe) >  args_info.eRange_arg*100 ) {
+          break;
+        }
+      }
+      const hash_entry &he = it->first;
+      barr_info &bi = it->second;
+      printf("%4d %s %6.2f", i+1, pt_to_str(he.structure).c_str(), he.energy/100.0);
+      printf(" %4d %6.2f %6d %6d %10.6f %6d %10.6f\n", bi.father+1, bi.e_diff/100.0, bi.bsize, bi.fbsize, bi.fen, bi.grad, bi.feng);
+      i++;
     }
   }
 
-
   // release resources
-  if (energy_barr!=NULL) free(energy_barr);
-  if (findpath_barr!=NULL) free(findpath_barr);
   if (seq!=NULL) free(seq);
   if (name!=NULL) free(name);
   cmdline_parser_free(&args_info);
-  for(unsigned int i=0; i<output_he.size(); i++) {
-    free(output_he[i].structure);
-  }
 
   // time?
   if (args_info.verbose_lvl_arg>0) {
@@ -598,6 +546,94 @@ char *read_previous(char *previous, map<hash_entry, int, compare_map> &output)
   }
 
   fclose(fprev);
+  return seq;
+}
+
+char *read_barr(char *barr_arg, map<hash_entry, barr_info, compare_map> &output)
+{
+  char *seq;
+  FILE *fbarr;
+  fbarr = fopen(barr_arg, "r");
+  if (fbarr == NULL) {
+    fprintf(stderr, "Cannot open file \"%s\".\n", barr_arg);
+    exit(EXIT_FAILURE);
+  }
+  char *line = my_getline(fbarr);
+  char *p = strtok(line, " \t\n");
+  while (p) {
+    if (isSeq(p)) {
+      seq = (char*)malloc((strlen(p)+1)*sizeof(char));
+      strcpy(seq, p);
+      break;
+    }
+    p = strtok(NULL, " \t\n");
+  }
+  free(line);
+
+  if (seq == NULL) {
+    fprintf(stderr, "Couldn't find sequence on first line of file \"%s\"\n", barr_arg);
+    fclose(fbarr);
+    exit(EXIT_FAILURE);
+  }
+  // read previously found minima:
+  while ((line = my_getline(fbarr))) {
+    p = strtok(line, " \t\n");
+
+    hash_entry he;
+    he.structure = NULL;
+    he.energy = INT_MAX;
+
+    // read the stuff
+    sscanf(p, "%d", &he.num);
+    p = strtok(NULL, " \t\n");
+    if (p && isStruct(p)) {
+      he.structure = make_pair_table(p);
+    }
+    p = strtok(NULL, " \t\n");
+    if (p && he.structure && he.energy==INT_MAX) {
+      float en;
+      if (sscanf(p, "%f", &en)==1) {
+        he.energy = en_fltoi(en);
+      }
+    }
+    barr_info bi;
+    int i =0;
+    float en;
+    while (p && he.structure && he.energy!=INT_MAX) {
+      p = strtok(NULL, " \t\n");
+      i++;
+      switch (i){
+        case 1: sscanf(p, "%d", &bi.father); break;
+        case 2: sscanf(p, "%f", &en); bi.e_diff = en_fltoi(en); break;
+        case 3: sscanf(p, "%d", &bi.bsize); break;
+        case 4: sscanf(p, "%d", &bi.fbsize); break;
+        case 5: sscanf(p, "%f", &bi.fen); break;
+        case 6: sscanf(p, "%d", &bi.grad); break;
+        case 7: sscanf(p, "%f", &bi.feng); break;
+      }
+    }
+
+    // try to move it:
+    int last_en = he.energy;
+    while ((Opt.rand? move_rand(he) : move_set(he))!=0) {
+      Deg.Clear();
+    }
+    Deg.Clear();
+
+    // if we have it already:
+    map<hash_entry, barr_info, compare_map>::iterator it;
+    if ((it = output.find(he))!=output.end()) {
+      it->second = it->second + bi;
+      it->second.e_diff += last_en - he.energy;
+      free(he.structure);
+    } else {
+      output[he] = bi;
+    }
+
+    free(line);
+  }
+
+  fclose(fbarr);
   return seq;
 }
 
