@@ -50,8 +50,7 @@ void print_stats(unordered_map<hash_entry, gw_struct, hash_fncts> &structs)
   mean /= (double)count*100.0;
   entropy = entropy/(double)count - log(count);
 
-  fprintf(stderr, "Mean  : %.3f\n"
-                  "Entrpy: %.3f\n", mean, entropy);
+  fprintf(stderr, "Mean  : %.3f (Entrpy: %.3f)\n", mean, entropy);
 }
 //#include "move_set.h"
 
