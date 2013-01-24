@@ -468,7 +468,11 @@ int main(int argc, char **argv)
       }
       const hash_entry &he = it->first;
       barr_info &bi = it->second;
+<<<<<<< HEAD
       printf("%4d %s %6.2f", i+1, pt_to_str(he.structure).c_str(), he.energy/100.0);
+=======
+      printf("%4d %s %6.2f", i, pt_to_str(he.structure).c_str(), he.energy/100.0);
+>>>>>>> b426a76ce4b39eb9221db9bee82565ecbbd390f8
       printf(" %4d %6.2f %6d %6d %10.6f %6d %10.6f\n", bi.father+1, bi.e_diff/100.0, bi.bsize, bi.fbsize, bi.fen, bi.grad, bi.feng);
       i++;
     }
@@ -535,13 +539,26 @@ char *read_previous(char *previous, map<hash_entry, int, compare_map> &output)
         he.energy = en_fltoi(en);
       }
     }
+    // 2 aternatives: read father, e_diff and conut; or read only count
+    int father;
+    float e_diff;
+    int count;
     p = strtok(NULL, " \t\n");
     if (p && he.structure && he.energy!=INT_MAX) {
-      int count_lm;
-      if (sscanf(p, "%d", &count_lm)==1) {
-        output[he]=count_lm;
+      sscanf(p, "%d", &father);
+      p = strtok(NULL, " \t\n");
+      if (p && he.structure && he.energy!=INT_MAX) {
+        sscanf(p, "%f", &e_diff);
+        p = strtok(NULL, " \t\n");
+        if (p && he.structure && he.energy!=INT_MAX) {
+          sscanf(p, "%d", &count);
+        }
+      } else {
+        count = father;
       }
     }
+    // insert
+    output[he]=count;
     free(line);
   }
 
@@ -551,7 +568,7 @@ char *read_previous(char *previous, map<hash_entry, int, compare_map> &output)
 
 char *read_barr(char *barr_arg, map<hash_entry, barr_info, compare_map> &output)
 {
-  char *seq;
+  char *seq = NULL;
   FILE *fbarr;
   fbarr = fopen(barr_arg, "r");
   if (fbarr == NULL) {
@@ -614,11 +631,19 @@ char *read_barr(char *barr_arg, map<hash_entry, barr_info, compare_map> &output)
     }
 
     // try to move it:
+    Enc.Init(seq);
+    he.energy = Enc.Energy(he);
+    //fprintf(stderr, "%f\n", he.energy);
     int last_en = he.energy;
     while ((Opt.rand? move_rand(he) : move_set(he))!=0) {
       Deg.Clear();
     }
     Deg.Clear();
+
+    // print changes:
+    if (last_en != he.energy) {
+      fprintf(stderr, "%6.2f -> %6.2f %s\n", last_en/100.0, he.energy/100.0, pt_to_str(he.structure).c_str());
+    }
 
     // if we have it already:
     map<hash_entry, barr_info, compare_map>::iterator it;
