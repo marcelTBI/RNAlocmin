@@ -294,7 +294,7 @@ int main(int argc, char **argv)
       // first try to flood the highest bins
       for (int i=num-1; i>=0; i--) {
         // flood only if low number of walks ended there
-        if (output_num[i]<=threshold) {
+        if (output_num[i]<=threshold && Opt.floodMax>0) {
           //copy_arr(Enc.pt, output_he[i].structure);
           if (args_info.verbose_lvl_arg>2) fprintf(stderr,   "flooding  (%3d): %s %.2f\n", i, output_str[i].c_str(), output_he[i].energy/100.0);
 
@@ -468,11 +468,7 @@ int main(int argc, char **argv)
       }
       const hash_entry &he = it->first;
       barr_info &bi = it->second;
-<<<<<<< HEAD
-      printf("%4d %s %6.2f", i+1, pt_to_str(he.structure).c_str(), he.energy/100.0);
-=======
       printf("%4d %s %6.2f", i, pt_to_str(he.structure).c_str(), he.energy/100.0);
->>>>>>> b426a76ce4b39eb9221db9bee82565ecbbd390f8
       printf(" %4d %6.2f %6d %6d %10.6f %6d %10.6f\n", bi.father+1, bi.e_diff/100.0, bi.bsize, bi.fbsize, bi.fen, bi.grad, bi.feng);
       i++;
     }
@@ -539,7 +535,7 @@ char *read_previous(char *previous, map<hash_entry, int, compare_map> &output)
         he.energy = en_fltoi(en);
       }
     }
-    // 2 aternatives: read father, e_diff and conut; or read only count
+    // 2 aternatives: read father, e_diff and count; or read only count
     int father;
     float e_diff;
     int count;
