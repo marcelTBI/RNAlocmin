@@ -267,13 +267,13 @@ Degen::~Degen()
 void Degen::Clear()
 {
   // unprocessed
-  for (set<short*, setcomp>::iterator it=unprocessed.begin(); it!=unprocessed.end(); it++) {
+  for (set<short*, comps_short>::iterator it=unprocessed.begin(); it!=unprocessed.end(); it++) {
     if (*it) free(*it);
   }
   unprocessed.clear();
 
   // processed
-  for (set<short*, setcomp>::iterator it=processed.begin(); it!=processed.end(); it++) {
+  for (set<short*, comps_short>::iterator it=processed.begin(); it!=processed.end(); it++) {
     if (*it) free(*it);
   }
   processed.clear();

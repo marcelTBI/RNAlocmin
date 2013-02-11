@@ -87,9 +87,9 @@ struct barr_info { // info taken from barriers
 
 // functions that are down in file ;-)
 char *read_seq(char *seq_arg, char **name_out);
-int move(unordered_map<hash_entry, gw_struct, hash_fncts> &structs, map<hash_entry, int, compare_map> &output, set<hash_entry, compare_map> &output_shallow);
-char *read_previous(char *previous, map<hash_entry, int, compare_map> &output);
-char *read_barr(char *previous, map<hash_entry, barr_info, compare_map> &output);
+int move(unordered_map<hash_entry, gw_struct, hash_fncts> &structs, map<hash_entry, int, comps_entries> &output, set<hash_entry, comps_entries> &output_shallow);
+char *read_previous(char *previous, map<hash_entry, int, comps_entries> &output);
+char *read_barr(char *previous, map<hash_entry, barr_info, comps_entries> &output);
 
 int main(int argc, char **argv)
 {
@@ -119,9 +119,9 @@ int main(int argc, char **argv)
   }
 
   // keep track of structures & statistics
-  map<hash_entry, int, compare_map> output; // structures plus energies to output (+ how many hits has this minima)
-  map<hash_entry, barr_info, compare_map> output_barr; // structures plus energies to output (+ barr_info)
-  set<hash_entry, compare_map> output_shallow; // shallow structures (if minh specified)
+  map<hash_entry, int, comps_entries> output; // structures plus energies to output (+ how many hits has this minima)
+  map<hash_entry, barr_info, comps_entries> output_barr; // structures plus energies to output (+ barr_info)
+  set<hash_entry, comps_entries> output_shallow; // shallow structures (if minh specified)
   char *seq = NULL;
   char *name = NULL;
 
@@ -195,7 +195,7 @@ int main(int argc, char **argv)
     int threshold;
 
     int i=0;
-    for (map<hash_entry, int, compare_map>::iterator it=output.begin(); it!=output.end(); it++) {
+    for (map<hash_entry, int, comps_entries>::iterator it=output.begin(); it!=output.end(); it++) {
       // if not enough minima
       if (i<num) {
         // first check if the output is not shallow
@@ -294,7 +294,7 @@ int main(int argc, char **argv)
       // first try to flood the highest bins
       for (int i=num-1; i>=0; i--) {
         // flood only if low number of walks ended there
-        if (output_num[i]<=threshold) {
+        if (output_num[i]<=threshold && Opt.floodMax>0) {
           //copy_arr(Enc.pt, output_he[i].structure);
           if (args_info.verbose_lvl_arg>2) fprintf(stderr,   "flooding  (%3d): %s %.2f\n", i, output_str[i].c_str(), output_he[i].energy/100.0);
 
@@ -323,7 +323,7 @@ int main(int argc, char **argv)
 
             // now check if we have the minimum already (hopefuly yes ;-) )
             vector<hash_entry>::iterator it;
-            it = lower_bound(output_he.begin(), output_he.end(), *he, compare_vect);
+            it = lower_bound(output_he.begin(), output_he.end(), *he, compf_entries2);
 
             if (args_info.verbose_lvl_arg>1) fprintf(stderr, "minimum: %s %.2f\n", pt_to_str(he->structure).c_str(), he->energy/100.0);
             // we dont need it again
@@ -460,7 +460,7 @@ int main(int argc, char **argv)
     int mfe = output_barr.begin()->first.energy;
     printf("     %s\n", seq);
     int i=1;
-    for (map<hash_entry, barr_info, compare_map>::iterator it=output_barr.begin(); it!=output_barr.end(); it++) {
+    for (map<hash_entry, barr_info, comps_entries>::iterator it=output_barr.begin(); it!=output_barr.end(); it++) {
       if (args_info.eRange_given) {
         if ((it->first.energy - mfe) >  args_info.eRange_arg*100 ) {
           break;
@@ -488,7 +488,7 @@ int main(int argc, char **argv)
   return 0;
 }
 
-char *read_previous(char *previous, map<hash_entry, int, compare_map> &output)
+char *read_previous(char *previous, map<hash_entry, int, comps_entries> &output)
 {
   char *seq;
   FILE *fprev;
@@ -535,7 +535,7 @@ char *read_previous(char *previous, map<hash_entry, int, compare_map> &output)
         he.energy = en_fltoi(en);
       }
     }
-    // 2 aternatives: read father, e_diff and conut; or read only count
+    // 2 aternatives: read father, e_diff and count; or read only count
     int father;
     float e_diff;
     int count;
@@ -562,7 +562,7 @@ char *read_previous(char *previous, map<hash_entry, int, compare_map> &output)
   return seq;
 }
 
-char *read_barr(char *barr_arg, map<hash_entry, barr_info, compare_map> &output)
+char *read_barr(char *barr_arg, map<hash_entry, barr_info, comps_entries> &output)
 {
   char *seq = NULL;
   FILE *fbarr;
@@ -642,7 +642,7 @@ char *read_barr(char *barr_arg, map<hash_entry, barr_info, compare_map> &output)
     }
 
     // if we have it already:
-    map<hash_entry, barr_info, compare_map>::iterator it;
+    map<hash_entry, barr_info, comps_entries>::iterator it;
     if ((it = output.find(he))!=output.end()) {
       it->second = it->second + bi;
       it->second.e_diff += last_en - he.energy;
@@ -688,7 +688,7 @@ char *read_seq(char *seq_arg, char **name_out)
 }
 
 
-int move(unordered_map<hash_entry, gw_struct, hash_fncts> &structs, map<hash_entry, int, compare_map> &output, set<hash_entry, compare_map> &output_shallow)
+int move(unordered_map<hash_entry, gw_struct, hash_fncts> &structs, map<hash_entry, int, comps_entries> &output, set<hash_entry, comps_entries> &output_shallow)
 {
   // count moves
   num_moves++;
@@ -790,7 +790,7 @@ int move(unordered_map<hash_entry, gw_struct, hash_fncts> &structs, map<hash_ent
     if (Opt.verbose_lvl>2) fprintf(stderr, "\n  %s %d\n", pt_to_str(str.structure).c_str(), str.energy);
 
     // save for output
-    map<hash_entry, int, compare_map>::iterator it;
+    map<hash_entry, int, comps_entries>::iterator it;
     if ((it = output.find(str)) != output.end()) {
       it->second++;
       gw.he = it->first;

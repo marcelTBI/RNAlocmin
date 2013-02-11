@@ -10,25 +10,8 @@ extern "C" {
 
 #include "flood.h"
 
-bool compare_vect (const hash_entry &lhs, const hash_entry &rhs){
-  // first energies
-  if (lhs.energy != rhs.energy) {
-    return lhs.energy<rhs.energy;
-  }
-  // then structures (here we have structures as numbers, but we want to compare them as chars in bractet dot notation: "()." )
-  int i=1;
-  char l=0,r=0;
-  while (i<=lhs.structure[0]) {
-    l = (lhs.structure[i]==0?'.':(lhs.structure[i]<lhs.structure[lhs.structure[i]]?'(':')'));
-    r = (rhs.structure[i]==0?'.':(rhs.structure[i]<rhs.structure[rhs.structure[i]]?'(':')'));
-    if (l != r) break;
-    i++;
-  }
-  return (i<=lhs.structure[0] && l<r);
-}
-
 // global priority queue for stuff in flooding (does not hold memory - memory is in hash)
-priority_queue<hash_entry*, vector<hash_entry*>, compare_queue> neighs;
+priority_queue<hash_entry*, vector<hash_entry*>, comps_entries_rev> neighs;
 int energy_lvl;
 bool debugg;
 int top_lvl;
