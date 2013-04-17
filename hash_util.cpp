@@ -20,6 +20,49 @@ short *allocopy(short *src)
   return res;
 }
 
+// does not depend on number - just on dot-bracket notation:
+bool compf_short (const short *lhs, const short *rhs) {
+  int i=1;
+  char l,r;
+  while (i<=lhs[0]) {
+    l = (lhs[i]==0?'.':(lhs[i]<lhs[lhs[i]]?')':'('));
+    r = (rhs[i]==0?'.':(rhs[i]<rhs[rhs[i]]?')':'('));
+    if (l != r) {
+      //fprintf (stderr, "%c %c %d %d\n", l, r, l, r);
+      break;
+    }
+    i++;
+  }
+  return (i<=lhs[0] && l<r);
+}
+
+bool compf_entries (const hash_entry *lhs, const hash_entry *rhs) {
+  if (lhs->energy!=rhs->energy) return lhs->energy<rhs->energy;
+  return compf_short(lhs->structure, rhs->structure);
+}
+bool compf_entries2 (const hash_entry &lhs, const hash_entry &rhs)
+{
+  if (lhs.energy!=rhs.energy) return lhs.energy<rhs.energy;
+  return compf_short(lhs.structure, rhs.structure);
+}
+
+bool compf_short_rev (const short *lhs, const short *rhs) {
+  int i=1;
+  char l,r;
+  while (i<=lhs[0]) {
+    l = (lhs[i]==0?'.':(lhs[i]<lhs[lhs[i]]?')':'('));
+    r = (rhs[i]==0?'.':(rhs[i]<rhs[rhs[i]]?')':'('));
+    if (l != r) break;
+    i++;
+  }
+  return (i<=lhs[0] && l>r);
+}
+
+bool compf_entries_rev (const hash_entry *lhs, const hash_entry *rhs) {
+  if (lhs->energy!=rhs->energy) return lhs->energy>rhs->energy;
+  return compf_short_rev(lhs->structure, rhs->structure);
+}
+
 hash_entry *copy_entry(const hash_entry *he)
 {
   hash_entry *he_n = (hash_entry*) space(sizeof(hash_entry));
@@ -54,7 +97,7 @@ void print_stats(unordered_map<hash_entry, gw_struct, hash_fncts> &structs)
 }
 //#include "move_set.h"
 
-void add_stats(unordered_map<hash_entry, gw_struct, hash_fncts> &structs, map<hash_entry, int, compare_map> &output)
+void add_stats(unordered_map<hash_entry, gw_struct, hash_fncts> &structs, map<hash_entry, int, comps_entries> &output)
 {
   unordered_map<hash_entry, gw_struct, hash_fncts>::iterator it;
   for (it=structs.begin(); it!=structs.end(); it++) {

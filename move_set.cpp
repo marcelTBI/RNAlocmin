@@ -559,7 +559,7 @@ int find_lone_pair(short* str)
 }
 
 // print rates to a file
-void print_rates(char *filename, double temp, int num, float *energy_barr, vector<int> &output_en)
+void print_rates(char *filename, double temp, int num, float *energy_barr, vector<int> &output_en, bool only_saddles)
 {
   FILE *rates;
   rates = fopen(filename, "w");
@@ -575,7 +575,8 @@ void print_rates(char *filename, double temp, int num, float *energy_barr, vecto
         // Arhenius kinetics (as A method in treekin)
         res = 1.0*exp(-(energy_barr[i*num+j]-(output_en[i]/100.0))/_kT);
       }
-      fprintf(rates, "%10.4g ", res);
+      if (only_saddles) fprintf(rates, "%6.2f ", i==j?output_en[i]/100.0:energy_barr[i*num+j]);
+      else              fprintf(rates, "%10.4g ", res);
     }
     fprintf(rates, "\n");
   }

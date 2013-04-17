@@ -85,36 +85,13 @@ public:
   int Init(gengetopt_args_info &args_info);
 };
 
-// comparator for structures (in notation as used in energy_of_move)
-struct setcomp {
-  bool operator() (const short *lhs, const short *rhs) const {
-    // here we have structures as numbers, but we want to compare them as chars in bractet dot notation: "()."
-    int i=1;
-    char l=0,r=0;
-    while (i<=lhs[0]) {
-      l = (lhs[i]==0?'.':(lhs[i]<lhs[lhs[i]]?'(':')'));
-      r = (rhs[i]==0?'.':(rhs[i]<rhs[rhs[i]]?'(':')'));
-      if (l != r) break;
-      i++;
-    }
-    return (i<=lhs[0] && l<r);
-
-    /*
-    int i=1;
-    while (i<=lhs[0] && lhs[i]==rhs[i]) {
-      i++;
-    }
-    return (i<=lhs[0] && lhs[i]>rhs[i]);*/
-  }
-};
-
 // structure for degeneracy
 class Degen {
   // for degeneracy (structures with equal energies)
 public:
   int current;    // all structures here have this energy
-  set<short*, setcomp> processed;
-  set<short*, setcomp> unprocessed;
+  set<short*, comps_short> processed;
+  set<short*, comps_short> unprocessed;
 
 public:
   Degen();

@@ -46,6 +46,7 @@ option "bartree"            b "Generate possible barrier tree" flag off
 option "barr-name"          - "Name of barrier tree output file" string default="treeRNAloc.ps"
 
 section "Kinetics (rates for treekin program)"
+option "barrier-file"       - "File for saddle heights between LM" string no
 option "rates"              r "Create rates for treekin" flag off
 option "rates-file"         f "File where to write rates" string default="rates.out" no
 option "temp"               T "Temperature in Celsius (only for rates)" double default="37.0" no

@@ -164,30 +164,50 @@ struct hash_fncts2{
   }
 };
 
-// comparators for hash_lists (structure) (map and queue use different :-/ )
-struct compare_map {
+
+// comparators: all one 1 place
+// comparator for structures
+bool compf_short (const short *lhs, const short *rhs);
+struct comps_short {
+  bool operator() (const short *lhs, const short *rhs) const {
+    return compf_short(lhs, rhs);
+  }
+};
+
+// comparator for hash_entries
+bool compf_entries (const hash_entry *lhs, const hash_entry *rhs);
+bool compf_entries2 (const hash_entry &lhs, const hash_entry &rhs);
+struct comps_entries {
+  bool operator() (const hash_entry *lhs, const hash_entry *rhs) const {
+    if (lhs->energy!=rhs->energy) return lhs->energy<rhs->energy;
+    return compf_short(lhs->structure, rhs->structure);
+  }
   bool operator() (const hash_entry &lhs, const hash_entry &rhs) const {
-    // first energies
-    if (lhs.energy != rhs.energy) {
-      return lhs.energy<rhs.energy;
-    }
-    // then structures (here we have structures as numbers, but we want to compare them as chars in bractet dot notation: "()." )
-    int i=1;
-    char l=0,r=0;
-    while (i<=lhs.structure[0]) {
-      l = (lhs.structure[i]==0?'.':(lhs.structure[i]<lhs.structure[lhs.structure[i]]?'(':')'));
-      r = (rhs.structure[i]==0?'.':(rhs.structure[i]<rhs.structure[rhs.structure[i]]?'(':')'));
-      if (l != r) break;
-      i++;
-    }
-    return (i<=lhs.structure[0] && l<r);
+    if (lhs.energy!=rhs.energy) return lhs.energy<rhs.energy;
+    return compf_short(lhs.structure, rhs.structure);
+  }
+};
+
+bool compf_short_rev (const short *lhs, const short *rhs);
+struct comps_short_rev {
+  bool operator() (const short *lhs, const short *rhs) const {
+    return compf_short_rev(lhs, rhs);
+  }
+};
+
+// comparator for hash_entries
+bool compf_entries_rev (const hash_entry *lhs, const hash_entry *rhs);
+struct comps_entries_rev {
+  bool operator() (const hash_entry *lhs, const hash_entry *rhs) const {
+    if (lhs->energy!=rhs->energy) return lhs->energy>rhs->energy;
+    return compf_short_rev(lhs->structure, rhs->structure);
   }
 };
 
 // print stats about hash
 void print_stats(unordered_map<hash_entry, gw_struct, hash_fncts> &structs);
 // add stats from hash to output map
-void add_stats(unordered_map<hash_entry, gw_struct, hash_fncts> &structs, map<hash_entry, int, compare_map> &output);
+void add_stats(unordered_map<hash_entry, gw_struct, hash_fncts> &structs, map<hash_entry, int, comps_entries> &output);
 
 
 // free hash
