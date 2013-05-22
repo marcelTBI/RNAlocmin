@@ -540,7 +540,7 @@ char *read_previous(char *previous, map<hash_entry, int, comps_entries> &output)
         he.energy = en_fltoi(en);
       }
     }
-    // 2 aternatives: read father, e_diff and count; or read only count
+    // 3 aternatives: read father, e_diff and count; or read only count; or read nothing
     int father;
     float e_diff;
     int count;
@@ -553,11 +553,16 @@ char *read_previous(char *previous, map<hash_entry, int, comps_entries> &output)
         p = strtok(NULL, " \t\n");
         if (p && he.structure && he.energy!=INT_MAX) {
           sscanf(p, "%d", &count);
-        }
+          p = strtok(NULL, " \t\n");
+          if (p && he.structure && he.energy!=INT_MAX) {
+            count = 0; // because we are reading barriers file without info about count...
+          }
+        } else count = 0;
+
       } else {
         count = father;
       }
-    }
+    } else count = 0;
     // insert
     output[he]=count;
     free(line);
