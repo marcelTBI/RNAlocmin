@@ -40,6 +40,7 @@ option "fix-barriers"       - "Fix barrier file for interior loops (just recompu
 section "Misc"
 option "numIntervals"       - "Number of intervals for Jing's visualisation" int default="0" no
 option "eRange"             - "Report only LM that are in range <MFE (or lowest found LM), MFE+eRange>" float no
+option "allegiance"         - "Filename where to output the allegiance of structures. Works properly only with RNAsubopt -e list." string hidden no
 
 section "Barrier tree"
 option "bartree"            b "Generate possible barrier tree" flag off

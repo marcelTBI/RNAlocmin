@@ -29,6 +29,16 @@ extern "C" {
 
 using namespace std;
 
+// dirty hack to "allegiance" stuff
+ //to be filled by 1st run
+map<hash_entry, hash_entry, comps_entries> str_to_LM;
+vector<hash_entry> structures;
+ // to be filled after
+map<hash_entry, int, comps_entries> LM_to_LMnum;
+static bool allegiance = false;
+
+
+
 inline bool isSeq(char *p)
 {
   // check first two chars - should be enough
@@ -140,6 +150,16 @@ int main(int argc, char **argv)
 
   seq_len = strlen(seq);
 
+  // allegiance:
+  FILE *alleg = NULL;
+  if (args_info.allegiance_given) {
+    alleg = fopen(args_info.allegiance_arg, "w");
+    if (alleg) {
+      allegiance = true;
+      fprintf(alleg, "       %s\n", seq);
+    }
+  }
+
   // time?
   if (args_info.verbose_lvl_arg>0) {
     fprintf(stderr, "Time to initialize: %.2f secs.\n", (clock() - clck1)/(double)CLOCKS_PER_SEC);
@@ -154,7 +174,7 @@ int main(int argc, char **argv)
 
   if (!args_info.fix_barriers_given) {
     // hash
-    unordered_map<hash_entry, gw_struct, hash_fncts> structs (HASHSIZE);
+    unordered_map<hash_entry, gw_struct, hash_fncts> structs (HASHSIZE); // structures to minima map
     while (!args_info.find_num_given || count != args_info.find_num_arg) {
       int res = move(structs, output, output_shallow);
       if (res==0)   continue; // same structure has been processed already
@@ -166,11 +186,9 @@ int main(int argc, char **argv)
 
     // ########################## end main loop - reads structures from RNAsubopt and process them
 
-    // free hash
     //int num_of_structures = hash_size();
     if (args_info.verbose_lvl_arg>0) print_stats(structs);
     add_stats(structs, output);
-    free_hash(structs);
 
     // time?
     if (args_info.verbose_lvl_arg>0) {
@@ -231,11 +249,26 @@ int main(int argc, char **argv)
           output_en[i]=it->first.energy;
           i++;
         }
+
+        // allegiance:
+        if (allegiance) LM_to_LMnum[it->first] = i;
+
       } else { // we have enough minima
         free(it->first.structure);
       }
     }
     output.clear();
+
+    // allegiance:
+    if (allegiance) {
+      for (int i=0; i<(int)structures.size(); i++) {
+        fprintf(alleg, "%6d %s %6.2f %6d\n", i+1, pt_to_str(structures[i].structure).c_str(), structures[i].energy/100.0, LM_to_LMnum[str_to_LM[structures[i]]]);
+        //free(structures[i].structure);
+      }
+      structures.clear();
+      LM_to_LMnum.clear();
+      str_to_LM.clear();
+    }
 
     // erase possible NULL elements...
     if (args_info.noSort_flag) {
@@ -438,10 +471,6 @@ int main(int argc, char **argv)
         printf(" %4d %6.2f %6d\n", nodes[i].father+1, nodes[i].saddle_height-nodes[i].height, output_num[i]);
       }
 
-      // release smth
-      for(unsigned int i=0; i<output_he.size(); i++) {
-        free(output_he[i].structure);
-      }
     } else {
 
       // printf output without fathers!
@@ -456,6 +485,13 @@ int main(int argc, char **argv)
         printf("\n");
       }
     }
+
+    // release smth
+    for(unsigned int i=0; i<output_he.size(); i++) {
+      free(output_he[i].structure);
+    }
+    // free hash
+    free_hash(structs);
 
     // release res:
     if (energy_barr!=NULL) free(energy_barr);
@@ -772,11 +808,16 @@ int move(unordered_map<hash_entry, gw_struct, hash_fncts> &structs, map<hash_ent
     /*if (1 || !energy_found) str.energy = Enc.Energy(str);
     else str.energy = (int)(energy*100.0+(energy<0.0 ? -0.5 : 0.5));*/
 
-    //if (en != str.energy) fprintf(stderr, "%d %d\n", en, str.energy);
+    // allegiance hack:
+    hash_entry he_str = str;
+    if (allegiance) {
+      structures.push_back(he_str);
+    }
 
-    // insert into hash
-    gw_struct &gw = structs[str];
-    gw.count = 1;
+
+    // insert into hash (memory is here only on left side)
+    gw_struct &lm = structs[str];
+    lm.count = 1;
 
     //is it canonical (noLP)
     if (Opt.noLP && find_lone_pair(str.structure)!=-1) {
@@ -803,12 +844,16 @@ int move(unordered_map<hash_entry, gw_struct, hash_fncts> &structs, map<hash_ent
     map<hash_entry, int, comps_entries>::iterator it;
     if ((it = output.find(str)) != output.end()) {
       it->second++;
-      gw.he = it->first;
+      lm.he = it->first;
       free(str.structure);
+      // allegiance hack:
+      if (allegiance) str_to_LM[he_str] = it->first;
     } else {
-      gw.he = str;
       str.num = output.size();
+      lm.he = str;
       output.insert(make_pair(str, 1));
+      // allegiance hack:
+      if (allegiance) str_to_LM[he_str] = str;
     }
   }
 
