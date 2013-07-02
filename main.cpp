@@ -730,6 +730,9 @@ char *read_seq(char *seq_arg, char **name_out)
   }
   fclose(fseq);
   if (name) (*name_out) = name;
+
+  // covert seq's T's to U's
+  for (int i=0; i<(int)strlen(seq); i++) if (seq[i]=='T') seq[i]='U';
   return seq;
 }
 
@@ -805,6 +808,7 @@ int move(unordered_map<hash_entry, gw_struct, hash_fncts> &structs, map<hash_ent
   } else {
     // find energy only if not in input (not working - does energy_of_move require energy_of_struct run first???)
     str.energy = Enc.Energy(str);
+    printf("\n%s\n%s %7.2f\n\n", Enc.seq, pt_to_str(str.structure).c_str(), str.energy/100.0);
     /*if (1 || !energy_found) str.energy = Enc.Energy(str);
     else str.energy = (int)(energy*100.0+(energy<0.0 ? -0.5 : 0.5));*/
 
