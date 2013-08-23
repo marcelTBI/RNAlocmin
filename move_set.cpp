@@ -25,7 +25,10 @@ int count_move() {return cnt_move;}
 int update_deepest(hash_entry &str, hash_entry &min);
 
 // if the base is lone
-inline bool lone_base(short *pt, int i);
+inline bool can_insert(short *pt, int i, int j);
+
+inline bool can_delete(short *pt, int i);
+inline bool can_delete2(short *pt, int i);
 
 // can move be done on this structure? (move is in the Enc)
 bool check_insert(hash_entry &str, int i, int j);
@@ -112,26 +115,24 @@ int deletions(hash_entry &str, hash_entry &minim)
 
       //if nolp enabled, make (maybe) 2nd delete
       if (Opt.noLP) {
-        int lone = -1;
-        if (lone_base(pt, i-1)) lone=i-1;
-        else if (lone_base(pt, i+1)) lone=i+1;
-        else if (lone_base(pt, pt[i]-1)) lone=pt[i]-1;
-        else if (lone_base(pt, pt[i]+1)) lone=pt[i]+1;
-
-        // check
-        if (lone != -1 && (pt[lone]==0 || pt[pt[lone]]==0)) {
-          fprintf(stderr, "WARNING: pt[%d(or %d)]!=\'.\'", lone, pt[lone]);
-        }
-
-        if (lone != -1) {
-          Enc.bp_left2=-lone-1;
-          Enc.bp_right2=-pt[lone]-1;
-        }
-        if (!lone_base(pt, pt[lone]-1) && !lone_base(pt, pt[lone]+1)) {
+        if (can_delete(pt, i)) {
+          cnt += update_deepest(str, minim);
+          // in case useFirst is on and structure is found, end
+          if (Opt.first && cnt > 0) return cnt;
+        } else if (can_delete2(pt, i)) {
+          Enc.bp_left2 = -(i+1);
+          Enc.bp_right2 = -(pt[i]-1);
           cnt += update_deepest(str, minim);
           // in case useFirst is on and structure is found, end
           if (Opt.first && cnt > 0) return cnt;
         }
+
+        /*
+        // check
+        if (lone != -1 && (pt[lone]==0 || pt[pt[lone]]==0)) {
+          fprintf(stderr, "WARNING: pt[%d(or %d)]!=\'.\'", lone, pt[lone]);
+        }*/
+
       } else {  // nolp not enabled
         cnt += update_deepest(str, minim);
         // in case useFirst is on and structure is found, end
@@ -165,7 +166,7 @@ int insertions(hash_entry &str, hash_entry &minim)
 
           if (Opt.noLP) {
             // if lone bases occur, try inserting one another base
-            if (lone_base(pt, i) || lone_base(pt, j)) {
+            if (!can_insert(pt, i, j)) {
               // inside
               if (try_insert(pt, Enc.seq, i+1, j-1)) {
                 Enc.bp_left2=i+1;
@@ -495,25 +496,86 @@ hash_entry *browse_neighs(hash_entry &str, int &saddle_en)
   return min;
 }
 
-
-//check if base is lone
-bool lone_base(short *pt, int i)
+inline void do_move(short *pt, int bp_left, int bp_right)
 {
-  if (i<=0 || i>pt[0]) return false;
-  // is not a base pair
-  if (pt[i]==0) return false;
+  // delete
+  if (bp_left<0) {
+    pt[-bp_left]=0;
+    pt[-bp_right]=0;
+  } else { // insert
+    pt[bp_left]=bp_right;
+    pt[bp_right]=bp_left;
+  }
+}
 
+inline bool lone_part(short *pt, int i, bool start)
+{
   // base is lone:
   if (i-1>0) {
     // is base pair and is the same bracket
-    if (pt[i-1]!=0 && ((pt[i-1]<pt[pt[i-1]]) == (pt[i]<pt[pt[i]]))) return false;
+    if (pt[i-1]!=0 && ((pt[i-1]>i-1) == start )) return false;
   }
 
   if (i+1<=pt[0]) {
-    if (pt[i+1]!=0 && ((pt[i-1]<pt[pt[i-1]]) == (pt[i]<pt[pt[i]]))) return false;
+    if (pt[i+1]!=0 && ((pt[i+1]>i+1) == start )) return false;
   }
 
   return true;
+}
+
+
+//check if base is lone
+inline bool can_insert(short *pt, int i, int j)
+{
+  if (i<=0 || i>pt[0] || j==0 || j>pt[0]) return false;
+
+  return !lone_part(pt, i, true) && !lone_part(pt, j, false);
+}
+
+// result in lp when remove i-? pair?
+inline bool can_delete(short *pt, int i)
+{
+  int j = pt[i];
+  if (i>j) swap(i,j);
+
+  if (i<=0 || i>pt[0] || j==0 || j>pt[0]) return false;
+
+  bool can_left = false, can_right = false;
+
+  // check if i-1 and i+1 wouldn't be lonely
+  if ((i-1==0 || pt[i-1]==0 || pt[i-1]<i-1 || (pt[i-1]>i-1 && i-2>0 && pt[i-2]!=0 && pt[i-2]>i-2)) &&
+     (           pt[i+1]==0                || (pt[i+1]>i+1 && i+2<=pt[0] && pt[i+2]!=0 && pt[i+2]>i+2))) can_left = true;
+
+  // check if j-1 and j+1 wouldn't be lonely
+  if ((              pt[j-1]==0                || (pt[j-1]<j-1 && j-2>0 && pt[j-2]!=0 && pt[j-2]<j-2)) &&
+     ( j+1>pt[0] || pt[j+1]==0 || pt[j+1]>j+1 || (pt[j+1]<j+1 && j+2<=pt[0] && pt[j+2]!=0 && pt[j+2]<j+2))) can_right = true;
+
+
+  return can_left && can_right;
+}
+
+// we are deleting 2 base-pairs (i, i+1)
+inline bool can_delete2(short *pt, int i)
+{
+  int j = pt[i];
+  if (i>j) swap(i,j);
+
+  if (i<=0 || i>pt[0] || j==0 || j>pt[0]) return false;
+
+  if (pt[i]!=pt[i+1]+1) return false;
+
+  bool can_left = false, can_right = false;
+
+  // check if i-1 and i+1 wouldn't be lonely
+  if ((i-1==0 || pt[i-1]==0 || pt[i-1]<i-1 || (pt[i-1]>i-1 && i-2>0 && pt[i-2]!=0 && pt[i-2]>i-2)) &&
+     (           pt[i+2]==0                || (pt[i+2]>i+2 && i+3<=pt[0] && pt[i+3]!=0 && pt[i+3]>i+3))) can_left = true;
+
+  // check if j-1 and j+1 wouldn't be lonely
+  if ((              pt[j-2]==0                || (pt[j-2]<j-2 && j-3>0 && pt[j-3]!=0 && pt[j-3]<j-3)) &&
+     ( j+1>pt[0] || pt[j+1]==0 || pt[j+1]>j+1 || (pt[j+1]<j+1 && j+2<=pt[0] && pt[j+2]!=0 && pt[j+2]<j+2))) can_right = true;
+
+
+  return can_left && can_right;
 }
 
 // find the structure's lone pairs

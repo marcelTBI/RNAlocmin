@@ -20,6 +20,7 @@ option "find-num"           - "Maximal number of local minima found\n(default = 
 option "verbose-lvl"        v "Level of verbosity (0 = nothing, 4 = full)\n WARNING: higher verbose levels increase computation time" int default="0" no
 option "depth"              - "Depth of findpath search (higher value increases running time)" int default="10" no
 option "minh"               - "Print only minima with energy barrier greater than this" double default="0.0" no
+option "min2"               - "Print only minima, which are not neighbours to saddle points (neighbours of its neighbours, which are not its neighbours are all higher in energy than it) - do not use with --minh" "flag off
 option "noLP"               - "Work only with canonical RNA structures (w/o isolated base pairs, cannot be combined with walk R option)" flag off
 option "walk"               w "Walking method used\nD ==> gradient descent\nF ==> use first found lower energy structure\nR ==> use random lower energy structure (does not work with --noLP and -m S options)" values="D","F","R" default="D" no
 option "useEOS"             e "Use energy_of_structure_pt calculation instead of energy_of_move (slower, it should not affect results)" flag off

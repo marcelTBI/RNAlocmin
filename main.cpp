@@ -18,6 +18,7 @@ extern "C" {
   #include "utils.h"
   #include "read_epars.h"
   #include "fold_vars.h"
+  #include "params.h"
 }
 
 #include "hash_util.h"
@@ -126,6 +127,9 @@ int main(int argc, char **argv)
   // dangle setup
   if (args_info.dangles_given) {
     dangles = args_info.dangles_arg;
+    model_detailsT  md;
+    set_model_details(&md);
+    md.dangles = dangles;
   }
 
   // keep track of structures & statistics
@@ -178,7 +182,7 @@ int main(int argc, char **argv)
     while (!args_info.find_num_given || count != args_info.find_num_arg) {
       int res = move(structs, output, output_shallow);
       if (res==0)   continue; // same structure has been processed already
-      if (res==-1)  break;
+      if (res==-1)  break; // error or end
       if (res==-2)  not_canonical++;
       if (res==1)   count=output.size();
     }
@@ -801,9 +805,9 @@ int move(unordered_map<hash_entry, gw_struct, hash_fncts> &structs, map<hash_ent
   while (p[len]!='\0' && p[len]!=' ') len++;
 
   if (len!=seq_len) {
-    fprintf(stderr, "Unequal lengths:\n(structure) %s\n (sequence) %s\n", p, Enc.seq);
+    fprintf(stderr, "WARNING: Unequal lengths:\n(structure) %s\n (sequence) %s\n", p, Enc.seq);
     free(line);
-    return -1;
+    return -0;
   }
 
   // was it before?
