@@ -185,6 +185,9 @@ int main(int argc, char **argv)
       if (res==-1)  break; // error or end
       if (res==-2)  not_canonical++;
       if (res==1)   count=output.size();
+
+
+      if (Opt.verbose_lvl>0 && num_moves%10000==0) fprintf(stderr, "processed %d, minima %d, time %f secs.\n", num_moves, count, (clock()-clck1)/(double)CLOCKS_PER_SEC);
     }
 
 
@@ -217,7 +220,9 @@ int main(int argc, char **argv)
     int threshold;
 
     int i=0;
+    int ii=0;
     for (map<hash_entry, int, comps_entries>::iterator it=output.begin(); it!=output.end(); it++) {
+      ii++;
       // if not enough minima
       if (i<num) {
         // first check if the output is not shallow
@@ -225,9 +230,13 @@ int main(int argc, char **argv)
           int saddle;
           hash_entry *escape = flood(it->first, saddle, Opt.minh);
 
+          if (args_info.verbose_lvl_arg>0 && ii%100 == 0) {
+            fprintf(stderr, "non-shallow remained: %d / %d; time: %.2f secs.\n", i, ii, (clock()-clck1)/(double)CLOCKS_PER_SEC);
+          }
+
           // shallow
           if (escape) {
-            if (args_info.verbose_lvl_arg>0) {
+            if (args_info.verbose_lvl_arg>1) {
               fprintf(stderr, "shallow: %s %6.2f (saddle: %s %6.2f)\n", pt_to_str(it->first.structure).c_str(), it->first.energy/100.0, pt_to_str(escape->structure).c_str(), escape->energy/100.0);
             }
             free_entry(escape);
@@ -291,14 +300,7 @@ int main(int argc, char **argv)
       output_num.resize(i);
     }
 
-    // threshold for flooding
-    vector<int> tmp = output_num;
-    sort(tmp.begin(), tmp.end());
-    int thr = num*args_info.floodPortion_arg;
-    thr--;
-    threshold = (thr<0 ? 0 : tmp[thr]);
-
-      // time?
+    // time?
     if (args_info.verbose_lvl_arg>0) {
       fprintf(stderr, "Discarding shallow minima: %.2f secs.\n", (clock() - clck1)/(double)CLOCKS_PER_SEC);
       clck1 = clock();
@@ -310,6 +312,14 @@ int main(int argc, char **argv)
 
     // find saddles - fill energy barriers
     if (args_info.rates_flag || args_info.bartree_flag || args_info.barrier_file_given) {
+      // threshold for flooding
+      vector<int> tmp = output_num;
+      sort(tmp.begin(), tmp.end());
+      int thr = num*args_info.floodPortion_arg;
+      thr--;
+      threshold = (thr<0 ? 0 : tmp[thr]);
+
+      // nodes
       nodeT nodes[num];
       energy_barr = (float*) malloc(num*num*sizeof(float));
       for (int i=0; i<num*num; i++) energy_barr[i]=1e10;
@@ -840,7 +850,7 @@ int move(unordered_map<hash_entry, gw_struct, hash_fncts> &structs, map<hash_ent
     lm.count = 1;
 
     //is it canonical (noLP)
-    if (Opt.noLP && find_lone_pair(str.structure)!=-1) {
+    if (Opt.noLP && find_lone_pair(str.structure)!=-1 && Opt.verbose_lvl>0) {
       fprintf(stderr, "WARNING: structure \"%s\" has lone pairs, skipping...\n", pt_to_str(str.structure).c_str());
       return -2;
     }
