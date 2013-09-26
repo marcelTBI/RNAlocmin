@@ -570,10 +570,10 @@ char *read_previous(char *previous, map<hash_entry, int, comps_entries> &output)
     exit(EXIT_FAILURE);
   }
   // read previously found minima:
+  hash_entry he;
   while ((line = my_getline(fprev))) {
     p = strtok(line, " \t\n");
 
-    hash_entry he;
     he.structure = NULL;
     he.energy = INT_MAX;
 
@@ -619,6 +619,7 @@ char *read_previous(char *previous, map<hash_entry, int, comps_entries> &output)
   }
 
   fclose(fprev);
+
   return seq;
 }
 

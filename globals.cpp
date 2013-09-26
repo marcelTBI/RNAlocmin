@@ -48,6 +48,16 @@ void Encoded::Init(const char *seq)
 
   s0   = encode_sequence(seq, 0);
   s1   = encode_sequence(seq, 1);
+
+
+  // just for sure:
+  int seq_len = strlen(seq);
+  short ch[seq_len+1];
+  ch[0] = seq_len;
+  for (int i=1;i<=seq_len;i++) ch[i]=0;
+  hash_entry he;
+  he.structure = ch;
+  he.energy = Enc.Energy(he);
 }
 
 void Encoded::PossMoves(hash_entry &str)
