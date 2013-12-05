@@ -376,7 +376,8 @@ int main(int argc, char **argv)
             // we dont need it again
             free_entry(he);
 
-            if (it!=output_he.end()) {
+            hash_eq heq;
+            if (it!=output_he.end() && heq(&*it, he)) {
               int pos = (int)(it-output_he.begin());
               if (args_info.verbose_lvl_arg>1) fprintf(stderr, "found father at pos: %d\n", pos);
 
