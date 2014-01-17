@@ -13,7 +13,7 @@ OBJ = RNAlocmin_cmdline.o\
 			flood.o\
 			hash_util.o\
 			main.o\
-			move_set.o\
+			RNAlocmin.o\
 			treeplot.o\
 			globals.o
 

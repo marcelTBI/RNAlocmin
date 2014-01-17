@@ -15,8 +15,9 @@ using namespace std;
 int count_move();
 
 // abs(float)
-inline float abs(float a) { return (a<0?-a:a); }
+//inline float abs(float a) { return (a<0?-a:a); }
 
+/*
 // reads a line no matter how long
 char* my_getline(FILE *fp);
 
@@ -28,7 +29,7 @@ int find_lone_pair(string &str);
 
 // if the structure has lone pairs
 int find_lone_pair(short* str);
-
+*/
 
 // ################################################### BIG (IMPORTANT) FUNCTIONS
 
@@ -40,9 +41,6 @@ int move_rand(hash_entry &str);
 
 // browse neighbours and apply funct (from Opt) on all of them (returns minimum) return saddle energy in saddle_en (in flooding) return if funct(str) returns true
 hash_entry *browse_neighs(hash_entry &str, int &saddle_en);
-
-// print rates/saddles to a file
-void print_rates(char *filename, double temp, int num, float *energy_barr, vector<int> &output_en, bool only_saddles = false);
 
 
 #endif

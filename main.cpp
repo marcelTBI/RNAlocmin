@@ -25,6 +25,7 @@ extern "C" {
 #include "globals.h"
 #include "move_set.h"
 #include "flood.h"
+#include "RNAlocmin.h"
 
 #include "barrier_tree.h"
 
@@ -37,7 +38,6 @@ vector<hash_entry> structures;
  // to be filled after
 map<hash_entry, int, comps_entries> LM_to_LMnum;
 static bool allegiance = false;
-
 
 
 inline bool isSeq(char *p)
@@ -181,13 +181,13 @@ int main(int argc, char **argv)
     unordered_map<hash_entry, gw_struct, hash_fncts> structs (HASHSIZE); // structures to minima map
     while (!args_info.find_num_given || count != args_info.find_num_arg) {
       int res = move(structs, output, output_shallow);
+
+      if (Opt.verbose_lvl>0 && num_moves%10000==0) fprintf(stderr, "processed %d, minima %d, time %f secs.\n", num_moves, count, (clock()-clck1)/(double)CLOCKS_PER_SEC);
+
       if (res==0)   continue; // same structure has been processed already
       if (res==-1)  break; // error or end
       if (res==-2)  not_canonical++;
       if (res==1)   count=output.size();
-
-
-      if (Opt.verbose_lvl>0 && num_moves%10000==0) fprintf(stderr, "processed %d, minima %d, time %f secs.\n", num_moves, count, (clock()-clck1)/(double)CLOCKS_PER_SEC);
     }
 
 

@@ -9,6 +9,7 @@ extern "C" {
 }
 
 #include "flood.h"
+#include "RNAlocmin.h"
 
 // global priority queue for stuff in flooding (does not hold memory - memory is in hash)
 priority_queue<hash_entry*, vector<hash_entry*>, comps_entries_rev> neighs;
