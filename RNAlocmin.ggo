@@ -24,7 +24,6 @@ option "noLP"               - "Work only with canonical RNA structures (w/o isol
 option "walk"               w "Walking method used\nD ==> gradient descent\nF ==> use first found lower energy structure\nR ==> use random lower energy structure (does not work with --noLP and -m S options)" values="D","F","R" default="D" no
 option "useEOS"             e "Use energy_of_structure_pt calculation instead of energy_of_move (slower, it should not affect results)" flag off
 option "paramFile"          P "Read energy parameters from paramfile, instead of using the default parameter set." string no
-option "noSort"             - "Don't sort the output (this is currently SLOWER than with sorting)" flag off
 option "dangles"            d "How to treat \"dangling end\" energies for bases adjacent to helices in free ends and multi-loops\n"
 details="\nWith -d1 only unpaired bases can participate in at most one dangling end, this is the\
  default for mfe folding but unsupported for the partition function folding.\n\nWith -d2 this check is ignored,\

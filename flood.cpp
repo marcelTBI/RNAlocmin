@@ -6,54 +6,58 @@
 
 extern "C" {
   #include "utils.h"
+  #include "move_set.h"
 }
 
 #include "flood.h"
+#include "RNAlocmin.h"
 
 // global priority queue for stuff in flooding (does not hold memory - memory is in hash)
-priority_queue<hash_entry*, vector<hash_entry*>, comps_entries_rev> neighs;
+priority_queue<struct_en*, vector<struct_en*>, comps_entries_rev> neighs;
 int energy_lvl;
 bool debugg;
 int top_lvl;
 // hash for the flooding
-unordered_set<hash_entry*, hash_fncts2, hash_eq> hash_flood (HASHSIZE);
-unordered_set<hash_entry*, hash_fncts2, hash_eq>::iterator it_hash;
+unordered_set<struct_en*, hash_fncts2, hash_eq> hash_flood (HASHSIZE);
+unordered_set<struct_en*, hash_fncts2, hash_eq>::iterator it_hash;
 
 
 // function to do on all the items...
-bool flood_func(hash_entry &input)
+int flood_func(struct_en *input, struct_en *output)
 {
   // have we seen him?
-  it_hash = hash_flood.find(&input);
+  it_hash = hash_flood.find(input);
   if (it_hash != hash_flood.end()) {
     // nothing to do with already processed structure
-    if (debugg) fprintf(stderr,     "   already seen: %s %.2f\n", pt_to_str(input.structure).c_str(), input.energy/100.0);
-    return false;
+    if (debugg) fprintf(stderr,     "   already seen: %s %.2f\n", pt_to_str(input->structure).c_str(), input->energy/100.0);
+    return 0;
   } else {
     // found escape? (its energy is lower than our energy lvl and we havent seen it)
-    if (input.energy < energy_lvl) {
+    if (input->energy < energy_lvl) {
       // ends flood and return it as a structure to walk down
-      if (debugg) fprintf(stderr,   "       escape  : %s %.2f\n", pt_to_str(input.structure).c_str(), input.energy/100.0);
-      return true;
+      free(output);
+      output = allocopy_se(input);
+      if (debugg) fprintf(stderr,   "       escape  : %s %.2f\n", pt_to_str(input->structure).c_str(), input->energy/100.0);
+      return 1;
     } else {
-      if (input.energy > top_lvl) {
-        if (debugg) fprintf(stderr, "energy too high: %s %.2f\n", pt_to_str(input.structure).c_str(), input.energy/100.0);
-        return false;
+      if (input->energy > top_lvl) {
+        if (debugg) fprintf(stderr, "energy too high: %s %.2f\n", pt_to_str(input->structure).c_str(), input->energy/100.0);
+        return 0;
       } else {
-        if (debugg) fprintf(stderr, "       adding  : %s %.2f\n", pt_to_str(input.structure).c_str(), input.energy/100.0);
+        if (debugg) fprintf(stderr, "       adding  : %s %.2f\n", pt_to_str(input->structure).c_str(), input->energy/100.0);
         // just add it to the queue... and to hash
-        hash_entry *he_tmp = (hash_entry*)space(sizeof(hash_entry));
-        he_tmp->structure = allocopy(input.structure);
-        he_tmp->energy = input.energy;
+        struct_en *he_tmp = (struct_en*)space(sizeof(struct_en));
+        he_tmp->structure = allocopy(input->structure);
+        he_tmp->energy = input->energy;
         neighs.push(he_tmp);
         hash_flood.insert(he_tmp);
-        return false;
+        return 0;
       }
     }
   }
 }
 
-hash_entry* flood(const hash_entry &he, int &saddle_en, int maxh)
+struct_en* flood(const struct_en &he, int &saddle_en, int maxh)
 {
   int count = 0;
   debugg = Opt.verbose_lvl>2;
@@ -66,10 +70,11 @@ hash_entry* flood(const hash_entry &he, int &saddle_en, int maxh)
 
   // init hash
   free_hash(hash_flood);
+  escape = NULL;
 
   // add the first structure to hash, get its adress and add it to priority queue
   {
-    hash_entry *he_tmp = (hash_entry*)space(sizeof(hash_entry));
+    struct_en *he_tmp = (struct_en*)space(sizeof(struct_en));
     he_tmp->structure = allocopy(he.structure);
     he_tmp->energy = he.energy;
     neighs.push(he_tmp);
@@ -79,10 +84,6 @@ hash_entry* flood(const hash_entry &he, int &saddle_en, int maxh)
   // save deg.first + create deg
   bool first = Opt.first;
   Opt.first = true;
-  Opt.f_point = flood_func;
-
-  // returning hash_entry
-  hash_entry *escape = NULL;
 
   // if minh specified, assign top_lvl
   if (maxh>0) {
@@ -97,21 +98,24 @@ hash_entry* flood(const hash_entry &he, int &saddle_en, int maxh)
     if (neighs.empty()) break;
 
     // get structure
-    hash_entry *he_top = neighs.top();
+    struct_en *he_top = neighs.top();
     neighs.pop();
     energy_lvl = he_top->energy;
 
     if (Opt.verbose_lvl>2) fprintf(stderr, "  neighbours of: %s %.2f\n", pt_to_str(he_top->structure).c_str(), he_top->energy/100.0);
 
-    hash_entry he_browse = *he_top;   // maybe not necessary...
-    he_browse.structure = allocopy(he_top->structure);
-    escape = browse_neighs(he_browse, saddle_en);
-    free(he_browse.structure);
+    short *ptable = allocopy(he_top->structure);
+    int verbose = Opt.verbose_lvl<2?0:Opt.verbose_lvl-2;
+    struct_en escape;
+    escape.energy = browse_neighs_pt(Enc.seq, ptable, Enc.s0, Enc.s1, verbose, Opt.shift, Opt.noLP, flood_func);
+    escape.structure = ptable;
 
-    if (escape && Opt.verbose_lvl>2) fprintf(stderr, "sad= %6.2f    : %s %.2f\n", saddle_en/100.0, pt_to_str(escape->structure).c_str(), escape->energy/100.0);
+    hash_eq heq;
+    bool exit_found = !heq(escape, *he_top);
+    if (exit_found && Opt.verbose_lvl>2) fprintf(stderr, "sad= %6.2f    : %s %.2f\n", saddle_en/100.0, pt_to_str(escape.structure).c_str(), escape.energy/100.0);
 
     // did we find exit from basin?
-    if (escape) {
+    if (exit_found) {
       break;
     }
 
@@ -120,10 +124,9 @@ hash_entry* flood(const hash_entry &he, int &saddle_en, int maxh)
 
   // restore deg options
   Opt.first = first;
-  Opt.f_point = NULL;
 
   // return status in saddle_en :/
-  if (!escape) {
+  if (!exit_found) {
     saddle_en = (neighs.empty() ? 1 : 0);
   }
 
@@ -135,6 +138,8 @@ hash_entry* flood(const hash_entry &he, int &saddle_en, int maxh)
 
   // destroy hash
   free_hash(hash_flood);
+
+  struct_en *result = (struct_en*)space(sizeof(struct_en));
 
   return escape;
 }

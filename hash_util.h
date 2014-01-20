@@ -7,36 +7,15 @@
 
 extern "C" {
   #include "utils.h"
+  #include "move_set.h"
 }
 
 using namespace std;
 
-// copying of arrays
-short* allocopy(short *src);
-void copy_arr(short *desc, short *src);
-
-
-typedef struct _hash_entry {
-  short *structure;    /* my structure */
-  int energy;       /* my energy */
-
-  int num; // just for noSort
-
-  bool operator==(const _hash_entry &second) const{
-    int i=1;
-    while (i<=structure[0] && structure[i]==second.structure[i]) {
-      i++;
-    }
-    if (i>structure[0]) return true;
-    else return false;
-  }
-
-} hash_entry;
-
 // help struct for hash
 struct gw_struct {
   int count;
-  hash_entry he; // does not contain memory
+  struct_en he; // does not contain memory
   gw_struct(){
     he.structure = NULL;
     count = 0;
@@ -62,7 +41,16 @@ struct gw_struct {
 }
 
 struct hash_eq {
-  bool operator()(const hash_entry *lhs, const hash_entry *rhs) const{
+  bool operator()(const struct_en &lhs, const struct_en &rhs) const{
+    int i=1;
+    while (i<=lhs.structure[0] && lhs.structure[i]==rhs.structure[i]) {
+      i++;
+    }
+    if (i>lhs.structure[0]) return true;
+    else return false;
+  }
+
+  bool operator()(const struct_en *lhs, const struct_en *rhs) const{
     int i=1;
     while (i<=lhs->structure[0] && lhs->structure[i]==rhs->structure[i]) {
       i++;
@@ -73,7 +61,7 @@ struct hash_eq {
 };
 
 struct hash_fncts{
-  size_t operator()(const hash_entry &x) const {
+  size_t operator()(const struct_en &x) const {
 
   register short *k;        /* the key */
   register unsigned  length;   /* the length of the key */
@@ -119,7 +107,7 @@ struct hash_fncts{
 };
 
 struct hash_fncts2{
-  size_t operator()(const hash_entry *x) const {
+  size_t operator()(const struct_en *x) const {
 
   register short *k;        /* the key */
   register unsigned  length;   /* the length of the key */
@@ -175,14 +163,14 @@ struct comps_short {
 };
 
 // comparator for hash_entries
-bool compf_entries (const hash_entry *lhs, const hash_entry *rhs);
-bool compf_entries2 (const hash_entry &lhs, const hash_entry &rhs);
+bool compf_entries (const struct_en *lhs, const struct_en *rhs);
+bool compf_entries2 (const struct_en &lhs, const struct_en &rhs);
 struct comps_entries {
-  bool operator() (const hash_entry *lhs, const hash_entry *rhs) const {
+  bool operator() (const struct_en *lhs, const struct_en *rhs) const {
     if (lhs->energy!=rhs->energy) return lhs->energy<rhs->energy;
     return compf_short(lhs->structure, rhs->structure);
   }
-  bool operator() (const hash_entry &lhs, const hash_entry &rhs) const {
+  bool operator() (const struct_en &lhs, const struct_en &rhs) const {
     if (lhs.energy!=rhs.energy) return lhs.energy<rhs.energy;
     return compf_short(lhs.structure, rhs.structure);
   }
@@ -196,25 +184,25 @@ struct comps_short_rev {
 };
 
 // comparator for hash_entries
-bool compf_entries_rev (const hash_entry *lhs, const hash_entry *rhs);
+bool compf_entries_rev (const struct_en *lhs, const struct_en *rhs);
 struct comps_entries_rev {
-  bool operator() (const hash_entry *lhs, const hash_entry *rhs) const {
+  bool operator() (const struct_en *lhs, const struct_en *rhs) const {
     if (lhs->energy!=rhs->energy) return lhs->energy>rhs->energy;
     return compf_short_rev(lhs->structure, rhs->structure);
   }
 };
 
 // print stats about hash
-void print_stats(unordered_map<hash_entry, gw_struct, hash_fncts> &structs);
+void print_stats(unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs);
 // add stats from hash to output map
-void add_stats(unordered_map<hash_entry, gw_struct, hash_fncts> &structs, map<hash_entry, int, comps_entries> &output);
+void add_stats(unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs, map<struct_en, int, comps_entries> &output);
 
 
 // free hash
-void free_hash(unordered_map<hash_entry, gw_struct, hash_fncts> &structs);
-void free_hash(unordered_set<hash_entry*, hash_fncts2, hash_eq> &structs);
+void free_hash(unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs);
+void free_hash(unordered_set<struct_en*, hash_fncts2, hash_eq> &structs);
 
 // entry handling
-hash_entry *copy_entry(const hash_entry *he);
-void free_entry(hash_entry *he);
+struct_en *copy_entry(const struct_en *he);
+void free_entry(struct_en *he);
 #endif

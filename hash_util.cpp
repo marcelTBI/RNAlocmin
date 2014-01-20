@@ -4,22 +4,6 @@
 #include <stdlib.h>
 #include "hash_util.h"
 
-void copy_arr(short *dest, short *src)
-{
-  if (!src || !dest) {
-    fprintf(stderr, "Empty pointer in copying\n");
-    return;
-  }
-  memcpy(dest, src, sizeof(short)*(src[0]+1));
-}
-
-short *allocopy(short *src)
-{
-  short *res = (short*) space(sizeof(short)*(src[0]+1));
-  copy_arr(res, src);
-  return res;
-}
-
 // does not depend on number - just on dot-bracket notation:
 bool compf_short (const short *lhs, const short *rhs) {
   int i=1;
@@ -36,11 +20,11 @@ bool compf_short (const short *lhs, const short *rhs) {
   return (i<=lhs[0] && l<r);
 }
 
-bool compf_entries (const hash_entry *lhs, const hash_entry *rhs) {
+bool compf_entries (const struct_en *lhs, const struct_en *rhs) {
   if (lhs->energy!=rhs->energy) return lhs->energy<rhs->energy;
   return compf_short(lhs->structure, rhs->structure);
 }
-bool compf_entries2 (const hash_entry &lhs, const hash_entry &rhs)
+bool compf_entries2 (const struct_en &lhs, const struct_en &rhs)
 {
   if (lhs.energy!=rhs.energy) return lhs.energy<rhs.energy;
   return compf_short(lhs.structure, rhs.structure);
@@ -58,32 +42,32 @@ bool compf_short_rev (const short *lhs, const short *rhs) {
   return (i<=lhs[0] && l>r);
 }
 
-bool compf_entries_rev (const hash_entry *lhs, const hash_entry *rhs) {
+bool compf_entries_rev (const struct_en *lhs, const struct_en *rhs) {
   if (lhs->energy!=rhs->energy) return lhs->energy>rhs->energy;
   return compf_short_rev(lhs->structure, rhs->structure);
 }
 
-hash_entry *copy_entry(const hash_entry *he)
+struct_en *copy_entry(const struct_en *he)
 {
-  hash_entry *he_n = (hash_entry*) space(sizeof(hash_entry));
+  struct_en *he_n = (struct_en*) space(sizeof(struct_en));
   he_n->structure = allocopy(he->structure);
   he_n->energy = he->energy;
 
   return he_n;
 }
 
-void free_entry(hash_entry *he)
+void free_entry(struct_en *he)
 {
   if (he->structure) free(he->structure);
   free(he);
 }
 
-void print_stats(unordered_map<hash_entry, gw_struct, hash_fncts> &structs)
+void print_stats(unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs)
 {
   double mean = 0.0;
   int count = 0;
   double entropy = 0.0;
-  unordered_map<hash_entry, gw_struct, hash_fncts>::iterator it;
+  unordered_map<struct_en, gw_struct, hash_fncts>::iterator it;
   for (it=structs.begin(); it!=structs.end(); it++) {
     count += it->second.count;
     mean += (it->first.energy)*(it->second.count);
@@ -97,9 +81,9 @@ void print_stats(unordered_map<hash_entry, gw_struct, hash_fncts> &structs)
 }
 //#include "move_set.h"
 
-void add_stats(unordered_map<hash_entry, gw_struct, hash_fncts> &structs, map<hash_entry, int, comps_entries> &output)
+void add_stats(unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs, map<struct_en, int, comps_entries> &output)
 {
-  unordered_map<hash_entry, gw_struct, hash_fncts>::iterator it;
+  unordered_map<struct_en, gw_struct, hash_fncts>::iterator it;
   for (it=structs.begin(); it!=structs.end(); it++) {
     // add stats:
     //fprintf(stderr, "struct: %s %6.2f %d\n", pt_to_str(it->second.he.structure).c_str(), it->second.he.energy/100.0, it->second.count);
@@ -113,9 +97,9 @@ void add_stats(unordered_map<hash_entry, gw_struct, hash_fncts> &structs, map<ha
 }
 
 // free hash
-void free_hash(unordered_map<hash_entry, gw_struct, hash_fncts> &structs)
+void free_hash(unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs)
 {
-  unordered_map<hash_entry, gw_struct, hash_fncts>::iterator it;
+  unordered_map<struct_en, gw_struct, hash_fncts>::iterator it;
   for (it=structs.begin(); it!=structs.end(); it++) {
     free(it->first.structure);
   }
@@ -123,9 +107,9 @@ void free_hash(unordered_map<hash_entry, gw_struct, hash_fncts> &structs)
 }
 
 // free hash
-void free_hash(unordered_set<hash_entry*, hash_fncts2, hash_eq> &structs)
+void free_hash(unordered_set<struct_en*, hash_fncts2, hash_eq> &structs)
 {
-  unordered_set<hash_entry*, hash_fncts2, hash_eq>::iterator it;
+  unordered_set<struct_en*, hash_fncts2, hash_eq>::iterator it;
   for (it=structs.begin(); it!=structs.end(); it++) {
     free((*it)->structure);
     free(*it);

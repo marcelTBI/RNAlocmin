@@ -49,17 +49,17 @@ public:
   short *Struct(const char *str);  // should be freed!!!
 
   void Forget();
-  inline void Move(hash_entry &he, bool first = true, bool second = true);
-  void UndoMove(hash_entry &he, bool first = true, bool second = true);
+  inline void Move(struct_en &he, bool first = true, bool second = true);
+  void UndoMove(struct_en &he, bool first = true, bool second = true);
 
   // energy calculations on structures
-  int Energy(hash_entry &he);
-  int EnergyOfMove(hash_entry &he);
+  int Energy(struct_en &he);
+  int EnergyOfMove(struct_en &he);
 
   // permute possible moves
   void Permute();
 
-  void PossMoves(hash_entry &str);
+  void PossMoves(struct_en &str);
 };
 
 // cute options singleton class
@@ -74,9 +74,6 @@ public:
   bool shift;   // use shifts?
   int verbose_lvl; // level of verbosity
   int floodMax; // cap for flooding
-
-  // pointer to function used on every neighbour (in update deepest)
-  bool (*f_point) (hash_entry &);  // (I dont like it either, but it was easiest way to program it...:/ )
 
 public:
   Options();

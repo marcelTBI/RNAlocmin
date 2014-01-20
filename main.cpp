@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <math.h>
 #include <time.h>
 #include <limits.h>
+#include <string.h>
 
 #include <string>
 #include <set>
@@ -19,11 +19,12 @@ extern "C" {
   #include "read_epars.h"
   #include "fold_vars.h"
   #include "params.h"
+  #include "move_set.h"
 }
 
 #include "hash_util.h"
 #include "globals.h"
-#include "move_set.h"
+#include "RNAlocmin.h"
 #include "flood.h"
 
 #include "barrier_tree.h"
@@ -32,10 +33,10 @@ using namespace std;
 
 // dirty hack to "allegiance" stuff
  //to be filled by 1st run
-map<hash_entry, hash_entry, comps_entries> str_to_LM;
-vector<hash_entry> structures;
+map<struct_en, struct_en, comps_entries> str_to_LM;
+vector<struct_en> structures;
  // to be filled after
-map<hash_entry, int, comps_entries> LM_to_LMnum;
+map<struct_en, int, comps_entries> LM_to_LMnum;
 static bool allegiance = false;
 
 
@@ -98,9 +99,9 @@ struct barr_info { // info taken from barriers
 
 // functions that are down in file ;-)
 char *read_seq(char *seq_arg, char **name_out);
-int move(unordered_map<hash_entry, gw_struct, hash_fncts> &structs, map<hash_entry, int, comps_entries> &output, set<hash_entry, comps_entries> &output_shallow);
-char *read_previous(char *previous, map<hash_entry, int, comps_entries> &output);
-char *read_barr(char *previous, map<hash_entry, barr_info, comps_entries> &output);
+int move(unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs, map<struct_en, int, comps_entries> &output, set<struct_en, comps_entries> &output_shallow);
+char *read_previous(char *previous, map<struct_en, int, comps_entries> &output);
+char *read_barr(char *previous, map<struct_en, barr_info, comps_entries> &output);
 
 int main(int argc, char **argv)
 {
@@ -133,9 +134,9 @@ int main(int argc, char **argv)
   }
 
   // keep track of structures & statistics
-  map<hash_entry, int, comps_entries> output; // structures plus energies to output (+ how many hits has this minima)
-  map<hash_entry, barr_info, comps_entries> output_barr; // structures plus energies to output (+ barr_info)
-  set<hash_entry, comps_entries> output_shallow; // shallow structures (if minh specified)
+  map<struct_en, int, comps_entries> output; // structures plus energies to output (+ how many hits has this minima)
+  map<struct_en, barr_info, comps_entries> output_barr; // structures plus energies to output (+ barr_info)
+  set<struct_en, comps_entries> output_shallow; // shallow structures (if minh specified)
   char *seq = NULL;
   char *name = NULL;
 
@@ -178,16 +179,18 @@ int main(int argc, char **argv)
 
   if (!args_info.fix_barriers_given) {
     // hash
-    unordered_map<hash_entry, gw_struct, hash_fncts> structs (HASHSIZE); // structures to minima map
+    unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> structs (HASHSIZE); // structures to minima map
     while (!args_info.find_num_given || count != args_info.find_num_arg) {
       int res = move(structs, output, output_shallow);
+
+      // first print out
+      if (Opt.verbose_lvl>0 && num_moves%10000==0) fprintf(stderr, "processed %d, minima %d, time %f secs.\n", num_moves, count, (clock()-clck1)/(double)CLOCKS_PER_SEC);
+
+      // then evaluate results
       if (res==0)   continue; // same structure has been processed already
       if (res==-1)  break; // error or end
       if (res==-2)  not_canonical++;
       if (res==1)   count=output.size();
-
-
-      if (Opt.verbose_lvl>0 && num_moves%10000==0) fprintf(stderr, "processed %d, minima %d, time %f secs.\n", num_moves, count, (clock()-clck1)/(double)CLOCKS_PER_SEC);
     }
 
 
@@ -207,8 +210,8 @@ int main(int argc, char **argv)
     int num = ((count > args_info.min_num_arg && args_info.min_num_arg!=0) ? args_info.min_num_arg : count);
     vector<string> output_str;
     output_str.resize(num);
-    vector<hash_entry> output_he;
-    hash_entry h;
+    vector<struct_en> output_he;
+    struct_en h;
     h.structure = NULL;
     output_he.resize(num, h);
     vector<int> output_en;
@@ -221,14 +224,14 @@ int main(int argc, char **argv)
 
     int i=0;
     int ii=0;
-    for (map<hash_entry, int, comps_entries>::iterator it=output.begin(); it!=output.end(); it++) {
+    for (map<struct_en, int, comps_entries>::iterator it=output.begin(); it!=output.end(); it++) {
       ii++;
       // if not enough minima
       if (i<num) {
         // first check if the output is not shallow
         if (Opt.minh>0) {
           int saddle;
-          hash_entry *escape = flood(it->first, saddle, Opt.minh);
+          struct_en *escape = flood(it->first, saddle, Opt.minh);
 
           if (args_info.verbose_lvl_arg>0 && ii%100 == 0) {
             fprintf(stderr, "non-shallow remained: %d / %d; time: %.2f secs.\n", i, ii, (clock()-clck1)/(double)CLOCKS_PER_SEC);
@@ -244,24 +247,13 @@ int main(int argc, char **argv)
             continue;
           }
         }
-        // then add it to outputs.
-        if (args_info.noSort_flag) {
-          if (it->first.num<num) {
-            output_str[it->first.num]=pt_to_str(it->first.structure);
-            output_num[it->first.num]=it->second;
-            output_he[it->first.num]=it->first;
-            output_en[it->first.num]=it->first.energy;
-            //printf("%d ", it->first.num);
-            i++;
-          }
-        } else {
-          if (args_info.verbose_lvl_arg > 2) fprintf(stderr, "%4d %s %6.2f\n", i, pt_to_str(it->first.structure).c_str(), it->first.energy/100.0);
-          output_str[i]=pt_to_str(it->first.structure);
-          output_num[i]=it->second;
-          output_he[i]=it->first;
-          output_en[i]=it->first.energy;
-          i++;
-        }
+
+        if (args_info.verbose_lvl_arg > 2) fprintf(stderr, "%4d %s %6.2f\n", i, pt_to_str(it->first.structure).c_str(), it->first.energy/100.0);
+        output_str[i]=pt_to_str(it->first.structure);
+        output_num[i]=it->second;
+        output_he[i]=it->first;
+        output_en[i]=it->first.energy;
+        i++;
 
         // allegiance:
         if (allegiance) LM_to_LMnum[it->first] = i;
@@ -346,7 +338,7 @@ int main(int argc, char **argv)
           if (args_info.verbose_lvl_arg>2) fprintf(stderr,   "flooding  (%3d): %s %.2f\n", i, output_str[i].c_str(), output_he[i].energy/100.0);
 
           int saddle;
-          hash_entry *he = flood(output_he[i], saddle);
+          struct_en *he = flood(output_he[i], saddle);
 
           // print info
           if (args_info.verbose_lvl_arg>1) {
@@ -369,7 +361,7 @@ int main(int argc, char **argv)
             Deg.Clear();
 
             // now check if we have the minimum already (hopefuly yes ;-) )
-            vector<hash_entry>::iterator it;
+            vector<struct_en>::iterator it;
             it = lower_bound(output_he.begin(), output_he.end(), *he, compf_entries2);
 
             if (args_info.verbose_lvl_arg>1) fprintf(stderr, "minimum: %s %.2f\n", pt_to_str(he->structure).c_str(), he->energy/100.0);
@@ -515,13 +507,13 @@ int main(int argc, char **argv)
     int mfe = output_barr.begin()->first.energy;
     printf("     %s\n", seq);
     int i=1;
-    for (map<hash_entry, barr_info, comps_entries>::iterator it=output_barr.begin(); it!=output_barr.end(); it++) {
+    for (map<struct_en, barr_info, comps_entries>::iterator it=output_barr.begin(); it!=output_barr.end(); it++) {
       if (args_info.eRange_given) {
         if ((it->first.energy - mfe) >  args_info.eRange_arg*100 ) {
           break;
         }
       }
-      const hash_entry &he = it->first;
+      const struct_en &he = it->first;
       barr_info &bi = it->second;
       printf("%4d %s %6.2f", i, pt_to_str(he.structure).c_str(), he.energy/100.0);
       printf(" %4d %6.2f %6d %6d %10.6f %6d %10.6f\n", bi.father+1, bi.e_diff/100.0, bi.bsize, bi.fbsize, bi.fen, bi.grad, bi.feng);
@@ -543,7 +535,7 @@ int main(int argc, char **argv)
   return 0;
 }
 
-char *read_previous(char *previous, map<hash_entry, int, comps_entries> &output)
+char *read_previous(char *previous, map<struct_en, int, comps_entries> &output)
 {
   char *seq;
   FILE *fprev;
@@ -570,7 +562,7 @@ char *read_previous(char *previous, map<hash_entry, int, comps_entries> &output)
     exit(EXIT_FAILURE);
   }
   // read previously found minima:
-  hash_entry he;
+  struct_en he;
   while ((line = my_getline(fprev))) {
     p = strtok(line, " \t\n");
 
@@ -578,7 +570,8 @@ char *read_previous(char *previous, map<hash_entry, int, comps_entries> &output)
     he.energy = INT_MAX;
 
     // read the stuff
-    sscanf(p, "%d", &he.num);
+    int num;
+    sscanf(p, "%d", &num);
     p = strtok(NULL, " \t\n");
     if (p && isStruct(p)) {
       he.structure = make_pair_table(p);
@@ -623,7 +616,7 @@ char *read_previous(char *previous, map<hash_entry, int, comps_entries> &output)
   return seq;
 }
 
-char *read_barr(char *barr_arg, map<hash_entry, barr_info, comps_entries> &output)
+char *read_barr(char *barr_arg, map<struct_en, barr_info, comps_entries> &output)
 {
   char *seq = NULL;
   FILE *fbarr;
@@ -653,12 +646,13 @@ char *read_barr(char *barr_arg, map<hash_entry, barr_info, comps_entries> &outpu
   while ((line = my_getline(fbarr))) {
     p = strtok(line, " \t\n");
 
-    hash_entry he;
+    struct_en he;
     he.structure = NULL;
     he.energy = INT_MAX;
 
     // read the stuff
-    sscanf(p, "%d", &he.num);
+    int num;
+    sscanf(p, "%d", &num);
     p = strtok(NULL, " \t\n");
     if (p && isStruct(p)) {
       he.structure = make_pair_table(p);
@@ -690,12 +684,15 @@ char *read_barr(char *barr_arg, map<hash_entry, barr_info, comps_entries> &outpu
     // try to move it:
     Enc.Init(seq);
     he.energy = Enc.Energy(he);
-    //fprintf(stderr, "%f\n", he.energy);
     int last_en = he.energy;
+    move_set(he);
+    /*
+    //fprintf(stderr, "%f\n", he.energy);
+
     while ((Opt.rand? move_rand(he) : move_set(he))!=0) {
       Deg.Clear();
     }
-    Deg.Clear();
+    Deg.Clear();*/
 
     // print changes:
     if (last_en != he.energy) {
@@ -703,7 +700,7 @@ char *read_barr(char *barr_arg, map<hash_entry, barr_info, comps_entries> &outpu
     }
 
     // if we have it already:
-    map<hash_entry, barr_info, comps_entries>::iterator it;
+    map<struct_en, barr_info, comps_entries>::iterator it;
     if ((it = output.find(he))!=output.end()) {
       it->second = it->second + bi;
       it->second.e_diff += last_en - he.energy;
@@ -764,7 +761,7 @@ char *read_seq(char *seq_arg, char **name_out)
 }
 
 
-int move(unordered_map<hash_entry, gw_struct, hash_fncts> &structs, map<hash_entry, int, comps_entries> &output, set<hash_entry, comps_entries> &output_shallow)
+int move(unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs, map<struct_en, int, comps_entries> &output, set<struct_en, comps_entries> &output_shallow)
 {
   // count moves
   num_moves++;
@@ -822,11 +819,11 @@ int move(unordered_map<hash_entry, gw_struct, hash_fncts> &structs, map<hash_ent
   }
 
   // was it before?
-  hash_entry str;
+  struct_en str;
   str.structure = Enc.Struct(p);
   free(line);
-  unordered_map<hash_entry, gw_struct, hash_fncts>::iterator it_s = structs.find(str);
-  //hash_entry *tmp_h = (hash_entry*)lookup_hash(str);
+  unordered_map<struct_en, gw_struct, hash_fncts, hash_eq>::iterator it_s = structs.find(str);
+  //struct_en *tmp_h = (struct_en*)lookup_hash(str);
   // if it was - release memory + get another
   if (it_s != structs.end()) {
     it_s->second.count++;
@@ -840,7 +837,7 @@ int move(unordered_map<hash_entry, gw_struct, hash_fncts> &structs, map<hash_ent
     else str.energy = (int)(energy*100.0+(energy<0.0 ? -0.5 : 0.5));*/
 
     // allegiance hack:
-    hash_entry he_str = str;
+    struct_en he_str = str;
     if (allegiance) {
       structures.push_back(he_str);
     }
@@ -863,16 +860,18 @@ int move(unordered_map<hash_entry, gw_struct, hash_fncts> &structs, map<hash_ent
     if (Opt.verbose_lvl>2) fprintf(stderr, "processing: %d %s\n", num_moves, pt_to_str(str.structure).c_str());
 
     // descend
+    move_set(str);
+    /*
     int i;
     while ((i = (Opt.rand? move_rand(str) : move_set(str)))!=0) {
       Deg.Clear();
     }
-    Deg.Clear();
+    Deg.Clear();*/
 
     if (Opt.verbose_lvl>2) fprintf(stderr, "\n  %s %d\n", pt_to_str(str.structure).c_str(), str.energy);
 
     // save for output
-    map<hash_entry, int, comps_entries>::iterator it;
+    map<struct_en, int, comps_entries>::iterator it;
     if ((it = output.find(str)) != output.end()) {
       it->second++;
       lm.he = it->first;
@@ -880,7 +879,7 @@ int move(unordered_map<hash_entry, gw_struct, hash_fncts> &structs, map<hash_ent
       // allegiance hack:
       if (allegiance) str_to_LM[he_str] = it->first;
     } else {
-      str.num = output.size();
+      //str.num = output.size();
       lm.he = str;
       output.insert(make_pair(str, 1));
       // allegiance hack:

@@ -55,12 +55,12 @@ void Encoded::Init(const char *seq)
   short ch[seq_len+1];
   ch[0] = seq_len;
   for (int i=1;i<=seq_len;i++) ch[i]=0;
-  hash_entry he;
+  struct_en he;
   he.structure = ch;
   he.energy = Enc.Energy(he);
 }
 
-void Encoded::PossMoves(hash_entry &str)
+void Encoded::PossMoves(struct_en &str)
 {
   moves_to.clear();
   moves_from.clear();
@@ -115,12 +115,12 @@ short *Encoded::Struct(const char *str)
   return make_pair_table(str);
 }
 
-int Encoded::Energy(hash_entry &he)
+int Encoded::Energy(struct_en &he)
 {
   return energy_of_structure_pt(seq, he.structure, s0, s1, 0);
 }
 
-int Encoded::EnergyOfMove(hash_entry &he)
+int Encoded::EnergyOfMove(struct_en &he)
 {
   int tmp_en;
   if (Opt.EOM) {
@@ -151,7 +151,7 @@ inline void do_move(short *pt, int bp_left, int bp_right)
   }
 }
 
-inline void Encoded::Move(hash_entry &he, bool first, bool second)
+inline void Encoded::Move(struct_en &he, bool first, bool second)
 {
   if (first && bp_left != 0) {
     do_move(he.structure, bp_left, bp_right);
@@ -161,7 +161,7 @@ inline void Encoded::Move(hash_entry &he, bool first, bool second)
   }
 }
 
-void Encoded::UndoMove(hash_entry &he, bool first, bool second)
+void Encoded::UndoMove(struct_en &he, bool first, bool second)
 {
   if (second && bp_left2 != 0) {
     do_move(he.structure, -bp_left2, -bp_right2);
@@ -256,7 +256,6 @@ int Options::Init(gengetopt_args_info &args_info)
   EOM = !args_info.useEOS_flag;
   first = args_info.walk_arg[0]=='F';
   rand = args_info.walk_arg[0]=='R';
-  f_point = NULL;
   shift = args_info.move_arg[0]=='S';
   verbose_lvl = args_info.verbose_lvl_arg;
   floodMax = args_info.floodMax_arg;
