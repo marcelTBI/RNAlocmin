@@ -47,21 +47,6 @@ bool compf_entries_rev (const struct_en *lhs, const struct_en *rhs) {
   return compf_short_rev(lhs->structure, rhs->structure);
 }
 
-struct_en *copy_entry(const struct_en *he)
-{
-  struct_en *he_n = (struct_en*) space(sizeof(struct_en));
-  he_n->structure = allocopy(he->structure);
-  he_n->energy = he->energy;
-
-  return he_n;
-}
-
-void free_entry(struct_en *he)
-{
-  if (he->structure) free(he->structure);
-  free(he);
-}
-
 void print_stats(unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs)
 {
   double mean = 0.0;

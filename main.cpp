@@ -242,7 +242,7 @@ int main(int argc, char **argv)
             if (args_info.verbose_lvl_arg>1) {
               fprintf(stderr, "shallow: %s %6.2f (saddle: %s %6.2f)\n", pt_to_str(it->first.structure).c_str(), it->first.energy/100.0, pt_to_str(escape->structure).c_str(), escape->energy/100.0);
             }
-            free_entry(escape);
+            free_se(escape);
             free(it->first.structure);
             continue;
           }
@@ -355,10 +355,7 @@ int main(int argc, char **argv)
           // if flood succesfull - walk down to find father minima
           if (he) {
             // walk down
-            while (move_set(*he)!=0) {
-              Deg.Clear();
-            };
-            Deg.Clear();
+            move_set(*he);
 
             // now check if we have the minimum already (hopefuly yes ;-) )
             vector<struct_en>::iterator it;
@@ -366,7 +363,7 @@ int main(int argc, char **argv)
 
             if (args_info.verbose_lvl_arg>1) fprintf(stderr, "minimum: %s %.2f\n", pt_to_str(he->structure).c_str(), he->energy/100.0);
             // we dont need it again
-            free_entry(he);
+            free_se(he);
 
             hash_eq heq;
             if (it!=output_he.end() && heq(&*it, he)) {

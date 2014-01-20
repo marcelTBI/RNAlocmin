@@ -13,7 +13,7 @@ extern "C" {
 #include "globals.h"
 
 // some singleton objects
-Degen Deg;
+//Degen Deg;
 Options Opt;
 Encoded Enc;
 
@@ -263,7 +263,7 @@ int Options::Init(gengetopt_args_info &args_info)
   return ret;
 }
 
-Degen::Degen()
+/*Degen::Degen()
 {
   current = 0;
 }
@@ -286,4 +286,4 @@ void Degen::Clear()
     if (*it) free(*it);
   }
   processed.clear();
-}
+}*/

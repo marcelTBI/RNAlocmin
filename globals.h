@@ -81,7 +81,7 @@ public:
   // return 0 if success
   int Init(gengetopt_args_info &args_info);
 };
-
+/*
 // structure for degeneracy
 class Degen {
   // for degeneracy (structures with equal energies)
@@ -94,7 +94,7 @@ public:
   Degen();
   ~Degen();
   void Clear();
-};
+};*/
 
 // some good functions
 
@@ -129,7 +129,7 @@ inline bool try_insert(const char *seq, int i, int j)
 }
 
 // some singleton objects
-extern Degen Deg;
+//extern Degen Deg;
 extern Options Opt;
 extern Encoded Enc;
 

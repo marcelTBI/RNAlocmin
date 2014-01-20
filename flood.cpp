@@ -17,6 +17,7 @@ priority_queue<struct_en*, vector<struct_en*>, comps_entries_rev> neighs;
 int energy_lvl;
 bool debugg;
 int top_lvl;
+bool found_exit;
 // hash for the flooding
 unordered_set<struct_en*, hash_fncts2, hash_eq> hash_flood (HASHSIZE);
 unordered_set<struct_en*, hash_fncts2, hash_eq>::iterator it_hash;
@@ -35,8 +36,8 @@ int flood_func(struct_en *input, struct_en *output)
     // found escape? (its energy is lower than our energy lvl and we havent seen it)
     if (input->energy < energy_lvl) {
       // ends flood and return it as a structure to walk down
-      free(output);
-      output = allocopy_se(input);
+      copy_se(output, input);
+      found_exit = true;
       if (debugg) fprintf(stderr,   "       escape  : %s %.2f\n", pt_to_str(input->structure).c_str(), input->energy/100.0);
       return 1;
     } else {
@@ -70,13 +71,13 @@ struct_en* flood(const struct_en &he, int &saddle_en, int maxh)
 
   // init hash
   free_hash(hash_flood);
-  escape = NULL;
+  found_exit = false;
+  struct_en *result = NULL;
+
 
   // add the first structure to hash, get its adress and add it to priority queue
   {
-    struct_en *he_tmp = (struct_en*)space(sizeof(struct_en));
-    he_tmp->structure = allocopy(he.structure);
-    he_tmp->energy = he.energy;
+    struct_en *he_tmp = allocopy_se(&he);
     neighs.push(he_tmp);
     hash_flood.insert(he_tmp);
   }
@@ -104,18 +105,14 @@ struct_en* flood(const struct_en &he, int &saddle_en, int maxh)
 
     if (Opt.verbose_lvl>2) fprintf(stderr, "  neighbours of: %s %.2f\n", pt_to_str(he_top->structure).c_str(), he_top->energy/100.0);
 
-    short *ptable = allocopy(he_top->structure);
     int verbose = Opt.verbose_lvl<2?0:Opt.verbose_lvl-2;
-    struct_en escape;
-    escape.energy = browse_neighs_pt(Enc.seq, ptable, Enc.s0, Enc.s1, verbose, Opt.shift, Opt.noLP, flood_func);
-    escape.structure = ptable;
+    he_top->energy = browse_neighs_pt(Enc.seq, he_top->structure, Enc.s0, Enc.s1, verbose, Opt.shift, Opt.noLP, flood_func);
 
-    hash_eq heq;
-    bool exit_found = !heq(escape, *he_top);
-    if (exit_found && Opt.verbose_lvl>2) fprintf(stderr, "sad= %6.2f    : %s %.2f\n", saddle_en/100.0, pt_to_str(escape.structure).c_str(), escape.energy/100.0);
+    if (found_exit && Opt.verbose_lvl>2) fprintf(stderr, "sad= %6.2f    : %s %.2f\n", saddle_en/100.0, pt_to_str(he_top->structure).c_str(), he_top->energy/100.0);
 
     // did we find exit from basin?
-    if (exit_found) {
+    if (found_exit) {
+      result = allocopy_se(he_top);
       break;
     }
 
@@ -126,7 +123,7 @@ struct_en* flood(const struct_en &he, int &saddle_en, int maxh)
   Opt.first = first;
 
   // return status in saddle_en :/
-  if (!exit_found) {
+  if (!found_exit) {
     saddle_en = (neighs.empty() ? 1 : 0);
   }
 
@@ -139,9 +136,8 @@ struct_en* flood(const struct_en &he, int &saddle_en, int maxh)
   // destroy hash
   free_hash(hash_flood);
 
-  struct_en *result = (struct_en*)space(sizeof(struct_en));
-
-  return escape;
+  // return found? structure
+  return result;
 }
 
 
