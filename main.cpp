@@ -120,6 +120,11 @@ int main(int argc, char **argv)
     exit(EXIT_FAILURE);
   }
 
+  // adjust temperature
+  if (args_info.temp_given) {
+    temperature = args_info.temp_arg;
+  }
+
   // read parameter file
   if (args_info.paramFile_given) {
     read_parameter_file(args_info.paramFile_arg);
