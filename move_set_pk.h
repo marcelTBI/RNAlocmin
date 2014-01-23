@@ -3,15 +3,17 @@
 
 #include <set>
 #include <map>
+#include <string>
 
 using namespace std;
 
-enum  PK_TYPE {S, H, K, L ,M}; // types of pseudoknot - S is PKfree structure
-float penalties[] = {0.0, 8.0, 12.0, 12.0, 12.0};
+enum  PK_TYPE {NPK, PK_H, PK_K, PK_L, PK_M}; // types of pseudoknot - S is PKfree structure
+const float penalties[] = {0.0, 8.0, 12.0, 12.0, 12.0};
 
 class Bpair {
 public:
   int start;  // left parenthesis
+  int end;    // right parenthesis
   int next_left; // enclosed in multiloop starting in? (next left nested sibling)
   int next_right; // next right nested sibling
   //int nestings; // number of nestings that I encapsule (0 means im topmost nesting - left_most = this) ??? we don't need this do we?
@@ -19,12 +21,13 @@ public:
   set<int> right_cross; // crossings from right side
 
   const bool operator<(const Bpair &second) const {
+    if (start == second.start) return end < second.end;
     return start < second.start;
   }
 
 public:
   Bpair(); // forbidden to use!!
-  Bpair(int left);
+  Bpair(int left, int right);
 };
 
 class Pseudoknot {
@@ -43,14 +46,21 @@ class Pseudoknot {
 
 public:
   Pseudoknot();
-  int AddBpair(short *str, int left, int right);
-  int RemoveBpair(short *str, int left);
+  int AddBpair(int left, int right);
+  int RemoveBpair(int left);
 
   // helpers
   int Start();
   int End();
   int Clear(); // returns the energy penalty freed
+
+  // clears/add back all crossing pairs with base pair of choice from structure
+  int ClearNeighsOfBP(short *str, int left);
+  int AddNeighsOfBP(short *str, int left);
 };
+
+string pt_to_str_pk(short *str);
+int try_pk();
 
 #endif
 

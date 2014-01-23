@@ -27,6 +27,7 @@ extern "C" {
 #include "RNAlocmin.h"
 #include "flood.h"
 #include "RNAlocmin.h"
+#include "move_set_pk.h"
 
 #include "barrier_tree.h"
 
@@ -105,6 +106,9 @@ char *read_barr(char *previous, map<struct_en, barr_info, comps_entries> &output
 
 int main(int argc, char **argv)
 {
+  try_pk();
+  exit(1);
+
   clock_t clck1 = clock();
 
   // parse arguments
