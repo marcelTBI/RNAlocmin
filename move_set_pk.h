@@ -8,7 +8,9 @@
 using namespace std;
 
 enum  PK_TYPE {NPK, PK_H, PK_K, PK_L, PK_M}; // types of pseudoknot - NPK is Kfree structure
-const float penalties[] = {0, 80, 120, 120, 120};
+const int beta1_pen[] = {0, 960, 1260, 1460, 1760};
+const int beta2_pen[] = {0, 10, 41, 10, 10};
+const int beta3_pen[] = {0, 10, 10, 10, 10};
 
 class Bpair {
 public:
