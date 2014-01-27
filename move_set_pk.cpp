@@ -40,6 +40,7 @@ Pseudoknot::Pseudoknot()
 {
   type = NPK;
   num_cross = 0;
+  energy_penalty = 0;
 }
 
 int Pseudoknot::AddBpair(int left, int right)
@@ -112,7 +113,7 @@ int Pseudoknot::AddBpair(int left, int right)
   // do we change type? and energy penalty
     //-- still has to be done
   // non nested:
-  if (new_bp.next_left != left || new_bp.next_right != left) {
+  if (new_bp.next_left == left && new_bp.next_right == left) {
     // maybe the type of PK has changed...
     // now just S->H and H -> nonH (disabled)
     bool nonH = false;
@@ -146,7 +147,8 @@ int Pseudoknot::RemoveBpair(int left)
   // check existence
   if ((to_remove = bpairs.find(left))!=bpairs.end()) {
     Bpair &rem_bp = to_remove->second;
-    num_cross -= rem_bp.left_cross.size(), rem_bp.right_cross.size();
+    num_cross -= rem_bp.left_cross.size();
+    num_cross -= rem_bp.right_cross.size();
 
     // remove the crosings:
     for (set<int>::iterator it = rem_bp.left_cross.begin(); it!=rem_bp.left_cross.end(); it++) {
@@ -261,6 +263,8 @@ int move_PK(Pseudoknot &PKstruct, short *str, char *seq, short *s0, short *s1, i
   //init
   bool deletion = (left<0);
   int energy = 0;
+  int tmp_pk = 0;
+  int tmp_em = 0;
 
   // deletion
   if (deletion) {
@@ -272,23 +276,25 @@ int move_PK(Pseudoknot &PKstruct, short *str, char *seq, short *s0, short *s1, i
     // energy_of_move energy: (here we ask only for insertion energy: if deletion, then we perform deletion and ask for energy of reinsertion)
     // first we have to remove all conflicting edges:
     int removed = PKstruct.ClearNeighsOfBP(str, -left);
-    fprintf(stderr, "%s cleared=%d\n", pt_to_str_pk(str).c_str(), removed);
-    energy -= energy_of_move_pt(str, s0, s1, -left, -right);
+    //fprintf(stderr, "%s cleared=%d\n", pt_to_str_pk(str).c_str(), removed);
+    tmp_em = -energy_of_move_pt(str, s0, s1, -left, -right);
     int added = PKstruct.AddNeighsOfBP(str, -left);
-    fprintf(stderr, "%s added=%d (%8.2F)\n", pt_to_str_pk(str).c_str(), added, energy/100.0);
+    //fprintf(stderr, "%s added=%d (%8.2F)\n", pt_to_str_pk(str).c_str(), added, energy/100.0);
 
     //at last update pseudoknot
-    energy += PKstruct.RemoveBpair(-left);
-  } else { // insertion
+    tmp_pk = PKstruct.RemoveBpair(-left);
+    //energy += tmp_en;
 
+  } else { // insertion
     // first update the Pseudoknot
-    energy += PKstruct.AddBpair(left, right);
+    tmp_pk = PKstruct.AddBpair(left, right);
+    //energy += tmp_en;
 
     // energy_of_move energy: (here we ask only for insertion energy: if deletion, then we perform deletion and ask for energy of reinsertion)
       // first we have to remove all conflicting edges:
     int removed = PKstruct.ClearNeighsOfBP(str, left);
     fprintf(stderr, "%s cleared=%d\n", pt_to_str_pk(str).c_str(), removed);
-    energy += energy_of_move_pt(str, s0, s1, left, right);
+    tmp_em = energy_of_move_pt(str, s0, s1, left, right);
     int added = PKstruct.AddNeighsOfBP(str, left);
     fprintf(stderr, "%s added=%d (%8.2F)\n", pt_to_str_pk(str).c_str(), added, energy/100.0);
 
@@ -298,18 +304,12 @@ int move_PK(Pseudoknot &PKstruct, short *str, char *seq, short *s0, short *s1, i
     str[right] = left;
   }
 
+  energy += tmp_em + tmp_pk;
+
+  fprintf(stderr, "energy change: %6.2f (pk %6.2f) (em %6.2f)\n", energy/100.0, tmp_pk/100.0, tmp_em/100.0);
+
   return energy;
 }
-
-/*class Stack
-{
-  vector<int> stck;
-
-  int top() {return stck[stck.size()-1];}
-  void push(int smth) {stck.push_back(smth);}
-  bool empty() {return stck.size()==0;}
-  void pop() {stck.pop_back();}
-};*/
 
 string pt_to_str_pk(short *str)
 {
