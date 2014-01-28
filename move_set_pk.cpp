@@ -134,16 +134,33 @@ int Pseudoknot::AddBpair(int left, int right)
     // S->H
     if (type == NPK && num_cross>0) {
       type = PK_H;
+
+      // constant penalty
       int tmp = -energy_penalty + beta1_pen[type];
       energy_penalty = beta1_pen[type];
+
+      // penalty for unpaired and stuff
+      pki = FindPKrange(left);
+      energy_penalty2 = GetPenalty(pki);
+      tmp += energy_penalty2;
+
       return tmp;
     }
+  } else if (type == PK_H) {  // nested.
+    pki.num_bp ++;
+    if (pki.start>left) pki.start = left;
+    if (pki.end<right) pki.end = right;
+    int tmp = -energy_penalty2 + GetPenalty(pki);
+    energy_penalty2 += tmp;
+
+    return tmp;
   }
   return 0;
 }
 int Pseudoknot::RemoveBpair(int left)
 {
   map<int, Bpair>::iterator to_remove;
+  int tmp = 0;
   // check existence
   if ((to_remove = bpairs.find(left))!=bpairs.end()) {
     Bpair &rem_bp = to_remove->second;
@@ -172,6 +189,40 @@ int Pseudoknot::RemoveBpair(int left)
       } else update.next_left = rem_bp.next_left;
     }
 
+    // was nested?
+    bool nested = false;
+    if (rem_bp.next_left!=left || rem_bp.next_right!=left) {
+      nested = true;
+    }
+
+    // now reset type:
+     // still TODO!!!
+      //now just H -> S:
+    if (num_cross == 0) {
+      type = NPK;
+      tmp = -energy_penalty + beta1_pen[type];
+      energy_penalty = beta1_pen[type];
+
+      tmp -= energy_penalty2;
+      energy_penalty2 = 0;
+
+    } else {
+      // reevaluate the energy_penalty2:
+      pki.num_bp --;
+      if (!nested) pki.num_nn_bp--; // wont happen now
+      // adjust the beginning and end?
+      if (pki.start == left) {
+        pki.start = (++FirstPoint(left))->first;  // maybe wrong for another PK types
+      }
+
+      if (pki.end == rem_bp.end) {
+        pki.end = (--FirstPoint(rem_bp.end))->first;
+      }
+
+      tmp = -energy_penalty2 + GetPenalty(pki);
+      energy_penalty2 += tmp;
+    }
+
     // update points:
     points.erase(left);
     points.erase(rem_bp.end);
@@ -179,17 +230,8 @@ int Pseudoknot::RemoveBpair(int left)
     // erase the base pair
     bpairs.erase(to_remove);
 
-    // now reset type:
-     // still TODO!!!
-      //now just H -> S:
-    if (num_cross == 0) {
-      type = NPK;
-      int tmp = -energy_penalty + beta1_pen[type];
-      energy_penalty = beta1_pen[type];
-      return tmp;
-    }
   }
-  return 0;
+  return tmp;
 }
 
 // helpers
@@ -210,6 +252,18 @@ int Pseudoknot::Clear() {
   int tmp = -energy_penalty + beta1_pen[type];
   energy_penalty = beta1_pen[type];
   return tmp;
+}
+
+int Pseudoknot::GetPenalty(pk_info pki)
+{
+  int unpaired = pki.end - pki.start + 1 - 2*pki.num_bp;
+  return unpaired * beta3_pen[type] + pki.num_nn_bp * beta2_pen[type];
+}
+
+map<int, int>::iterator Pseudoknot::FirstPoint(int point)
+{
+  std::pair<const int, int> pr(point, 0);
+  return lower_bound(points.begin(), points.end(), pr);
 }
 
 int Pseudoknot::ClearNeighsOfBP(short *str, int left)
@@ -429,6 +483,8 @@ int try_pk()
   moves.push_back(make_pair(10,19));
   moves.push_back(make_pair(11,17));
   moves.push_back(make_pair(4,14));
+  moves.push_back(make_pair(-9,-20));
+  moves.push_back(make_pair(9,20));
 
   make_pair_matrix();
   short *pt = make_pair_table(str);

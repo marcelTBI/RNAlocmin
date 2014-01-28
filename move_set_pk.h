@@ -50,7 +50,8 @@ class Pseudoknot {
 
   // data
   PK_TYPE type;
-  int energy_penalty;
+  int energy_penalty;   // penalty for making a pseudoknot (constant for type (beta1))
+  int energy_penalty2;  // penalty for arcs and unpaired stuff in PK (beta2 + beta3)
 
   map<int, Bpair> bpairs;
 
@@ -61,7 +62,7 @@ class Pseudoknot {
   map<int, int> points;  // points to starts and ends of bps.
 
   // pk info:
-  pk_info pki;
+  pk_info pki;     // info about the betas.
 
 public:
   Pseudoknot();
@@ -72,14 +73,17 @@ public:
   int Start();
   int End();
   int Clear(); // returns the energy penalty freed
+  map<int, int>::iterator FirstPoint(int point); // return first point from points equal or higher than point
 
   // clears/add back all crossing pairs with base pair of choice from structure
   int ClearNeighsOfBP(short *str, int left);
   int AddNeighsOfBP(short *str, int left);
 
   pk_info FindPKrange(int point);
+  int GetPenalty(pk_info pki);
 };
 
+int move_PK(Pseudoknot &PKstruct, short *str, char *seq, short *s0, short *s1, int left, int right);
 string pt_to_str_pk(short *str);
 int try_pk();
 #endif
