@@ -134,8 +134,8 @@ int Pseudoknot::AddBpair(int left, int right)
     // S->H
     if (type == NPK && num_cross>0) {
       type = PK_H;
-      int tmp = -energy_penalty + penalties[type];
-      energy_penalty = penalties[type];
+      int tmp = -energy_penalty + beta1_pen[type];
+      energy_penalty = beta1_pen[type];
       return tmp;
     }
   }
@@ -184,8 +184,8 @@ int Pseudoknot::RemoveBpair(int left)
       //now just H -> S:
     if (num_cross == 0) {
       type = NPK;
-      int tmp = -energy_penalty + penalties[type];
-      energy_penalty = penalties[type];
+      int tmp = -energy_penalty + beta1_pen[type];
+      energy_penalty = beta1_pen[type];
       return tmp;
     }
   }
@@ -207,8 +207,8 @@ int Pseudoknot::Clear() {
   points.clear();
   bpairs.clear();
   type = NPK;
-  int tmp = -energy_penalty + penalties[type];
-  energy_penalty = penalties[type];
+  int tmp = -energy_penalty + beta1_pen[type];
+  energy_penalty = beta1_pen[type];
   return tmp;
 }
 
@@ -293,10 +293,10 @@ int move_PK(Pseudoknot &PKstruct, short *str, char *seq, short *s0, short *s1, i
     // energy_of_move energy: (here we ask only for insertion energy: if deletion, then we perform deletion and ask for energy of reinsertion)
       // first we have to remove all conflicting edges:
     int removed = PKstruct.ClearNeighsOfBP(str, left);
-    fprintf(stderr, "%s cleared=%d\n", pt_to_str_pk(str).c_str(), removed);
+    //fprintf(stderr, "%s cleared=%d\n", pt_to_str_pk(str).c_str(), removed);
     tmp_em = energy_of_move_pt(str, s0, s1, left, right);
     int added = PKstruct.AddNeighsOfBP(str, left);
-    fprintf(stderr, "%s added=%d (%8.2F)\n", pt_to_str_pk(str).c_str(), added, energy/100.0);
+    //fprintf(stderr, "%s added=%d (%8.2F)\n", pt_to_str_pk(str).c_str(), added, energy/100.0);
 
 
     // lastly, update structure
@@ -361,6 +361,55 @@ string pt_to_str_pk(short *str)
 
   return res;
 }
+pk_info Pseudoknot::FindPKrange(int point)
+{
+  std::pair<const int, int> pr(point, 0);
+  map<int, int>::iterator it = lower_bound(points.begin(), points.end(), pr);
+
+  // setup the stuff
+  set<int> done;
+  queue<int> not_done;
+  int startpoint = it->second;
+  //while (bpairs[startpoint].next_right != startpoint) startpoint = bpairs[startpoint].next_right;
+  not_done.push(startpoint);
+  done.insert(startpoint);
+
+  // result
+  pk_info pki;
+  pki.start = pki.end = point;
+
+  while (!not_done.empty()) {
+
+    // get next one
+    int todo = not_done.front();
+    not_done.pop();
+
+    // adjust the result
+    Bpair &bp = bpairs[todo];
+    pki.start = min(pki.start, bp.start);
+    pki.end = max(pki.end, bp.end);
+    pki.num_bp++;
+    if (bp.next_right == bp.start) pki.num_nn_bp++;
+
+    // left cross
+    for (auto it = bp.left_cross.begin(); it!=bp.left_cross.end(); it++) {
+      if (done.count(*it)==0) {
+        not_done.push(*it);
+        done.insert(*it);
+      }
+    }
+
+    // right cross
+    for (auto it = bp.right_cross.begin(); it!=bp.right_cross.end(); it++) {
+      if (done.count(*it)==0) {
+        not_done.push(*it);
+        done.insert(*it);
+      }
+    }
+  }
+
+  return pki;
+}
 
 int try_pk()
 {
@@ -394,7 +443,13 @@ int try_pk()
     fprintf(stderr, "MOVE: %d %d\n", moves[i].first, moves[i].second);
     energy += move_PK(pk, pt, seq, s0, s1, moves[i].first, moves[i].second);
     fprintf(stderr, "%s %8.3f\n", pt_to_str_pk(pt).c_str(), energy/100.0);
+
+    pk_info pki = pk.FindPKrange(8);
+    fprintf(stderr, "pk - %d %d %d %d \n", pki.start, pki.end, pki.num_bp, pki.num_nn_bp);
   }
+
+  pk_info pki = pk.FindPKrange(8);
+  fprintf(stderr, "pk - %d %d %d %d \n", pki.start, pki.end, pki.num_bp, pki.num_nn_bp);
 
   free(pt);
   free(s0);

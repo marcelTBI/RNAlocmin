@@ -7,10 +7,10 @@
 
 using namespace std;
 
-enum  PK_TYPE {NPK, PK_H, PK_K, PK_L, PK_M}; // types of pseudoknot - NPK is Kfree structure
-const int beta1_pen[] = {0, 960, 1260, 1460, 1760};
-const int beta2_pen[] = {0, 10, 41, 10, 10};
-const int beta3_pen[] = {0, 10, 10, 10, 10};
+enum  PK_TYPE         {NPK, PK_H, PK_K, PK_L, PK_M}; // types of pseudoknot - NPK is Kfree structure
+const int beta1_pen[] = {0,  960, 1260, 1460, 1760};
+const int beta2_pen[] = {0,   10,   41,   10,   10};
+const int beta3_pen[] = {0,   10,   10,   10,   10};
 
 class Bpair {
 public:
@@ -32,6 +32,20 @@ public:
   Bpair(int left, int right);
 };
 
+struct pk_info {
+  int num_bp;    // bp total
+  int num_nn_bp; // bp non-nested
+  int start;
+  int end;
+
+  pk_info() {
+    num_bp = 0;
+    num_nn_bp = 0;
+    start = 0;
+    end = 0;
+  }
+};
+
 class Pseudoknot {
 
   // data
@@ -46,6 +60,9 @@ class Pseudoknot {
   // helper
   map<int, int> points;  // points to starts and ends of bps.
 
+  // pk info:
+  pk_info pki;
+
 public:
   Pseudoknot();
   int AddBpair(int left, int right);
@@ -59,11 +76,12 @@ public:
   // clears/add back all crossing pairs with base pair of choice from structure
   int ClearNeighsOfBP(short *str, int left);
   int AddNeighsOfBP(short *str, int left);
+
+  pk_info FindPKrange(int point);
 };
 
 string pt_to_str_pk(short *str);
 int try_pk();
-
 #endif
 
 
