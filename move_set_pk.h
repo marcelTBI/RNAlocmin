@@ -7,10 +7,11 @@
 
 using namespace std;
 
-enum  PK_TYPE         {NPK, PK_H, PK_K, PK_L, PK_M}; // types of pseudoknot - NPK is Kfree structure
-const int beta1_pen[] = {0,  960, 1260, 1460, 1760};
-const int beta2_pen[] = {0,   10,   41,   10,   10};
-const int beta3_pen[] = {0,   10,   10,   10,   10};
+enum  PK_TYPE           {NPK, PK_H, PK_K, PK_L, PK_M}; // types of pseudoknot - NPK is Kfree structure
+const int beta1_pen[] =   {0,  960, 1160, 1360, 1660};
+const int beta1mp_pen[] = {0, 1500, 1700, 1900, 2100};
+const int beta2_pen[] =   {0,   10,   10,   10,   10};
+const int beta3_pen[] =   {0,   10,   10,   10,   10};
 
 class Bpair {
 public:
@@ -66,6 +67,7 @@ class Pseudoknot {
 
 public:
   Pseudoknot();
+  Pseudoknot(short *str, int left); // construct from structure
   int AddBpair(int left, int right);
   int RemoveBpair(int left);
 

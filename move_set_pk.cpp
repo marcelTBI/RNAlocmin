@@ -43,8 +43,40 @@ Pseudoknot::Pseudoknot()
   energy_penalty = 0;
 }
 
+Pseudoknot::Pseudoknot(short *str, int left):
+  Pseudoknot()
+{
+  while (left && str[left]==0) left--;
+  if (left==0) throw;
+
+  int l = min(left, str[left]);
+  int r = max(left, str[left]);
+  int newl = l;
+  int newr = r;
+  AddBpair(l, r);
+
+  while (newl != l && newr != r) {
+    for (int i=l+1; i<r; i++) {
+      if (str[i]!=0) {
+        AddBpair(i, str[i]);
+        if (min(i, str[i])<newl) newl = min(i, str[i]);
+        if (max(i, str[i])>newr) newr = max(i, str[i]);
+      }
+    }
+  }
+
+  for (int i=l-1; i>minl; i++)
+
+
+
+}
+
 int Pseudoknot::AddBpair(int left, int right)
 {
+  // check for duplicity
+  if (points.find(left)!=points.end()) return 0;
+  if (left > right) swap(left, right);
+
   // create new:
   Bpair new_bp(left, right);
 
