@@ -49,26 +49,33 @@ Pseudoknot::Pseudoknot(short *str, int left):
   while (left && str[left]==0) left--;
   if (left==0) throw;
 
-  int l = min(left, str[left]);
-  int r = max(left, str[left]);
-  int newl = l;
-  int newr = r;
-  AddBpair(l, r);
+  int curr_l = min(left, (int)str[left]);
+  int curr_r = max(left, (int)str[left]);
+  int done_l = -1;
+  int done_r = -1;
+  AddBpair(curr_l, curr_r);
 
-  while (newl != l && newr != r) {
+  // get all crossing pairs:
+  while (curr_l != done_l && curr_r != done_r) {
+    int l = curr_l;
+    int r = curr_r;
     for (int i=l+1; i<r; i++) {
+      // jump over done interval
+      if (i == done_l) {
+        i = done_r;
+        continue;
+      }
+      // base pair
       if (str[i]!=0) {
         AddBpair(i, str[i]);
-        if (min(i, str[i])<newl) newl = min(i, str[i]);
-        if (max(i, str[i])>newr) newr = max(i, str[i]);
+        if (min(i, (int)str[i])<curr_l) curr_l = min(i, (int)str[i]);
+        if (max(i, (int)str[i])>curr_r) curr_r = max(i, (int)str[i]);
       }
     }
+
+    done_l = l;
+    done_r = r;
   }
-
-  for (int i=l-1; i>minl; i++)
-
-
-
 }
 
 int Pseudoknot::AddBpair(int left, int right)
@@ -344,7 +351,7 @@ int Pseudoknot::AddNeighsOfBP(short *str, int left)
   return res;
 }
 
-int move_PK(Pseudoknot &PKstruct, short *str, char *seq, short *s0, short *s1, int left, int right)
+int move_PK(Pseudoknot &PKstruct, short *str, short *s0, short *s1, int left, int right)
 {
   //init
   bool deletion = (left<0);
@@ -529,7 +536,7 @@ int try_pk()
   fprintf(stderr, "%s %8.3f\n", pt_to_str_pk(pt).c_str(), energy/100.0);
   for (unsigned int i=0; i<moves.size(); i++) {
     fprintf(stderr, "MOVE: %d %d\n", moves[i].first, moves[i].second);
-    energy += move_PK(pk, pt, seq, s0, s1, moves[i].first, moves[i].second);
+    energy += move_PK(pk, pt, s0, s1, moves[i].first, moves[i].second);
     fprintf(stderr, "%s %8.3f\n", pt_to_str_pk(pt).c_str(), energy/100.0);
 
     pk_info pki = pk.FindPKrange(8);

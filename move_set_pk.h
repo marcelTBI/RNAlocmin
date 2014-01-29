@@ -5,6 +5,8 @@
 #include <map>
 #include <string>
 
+#include "move_set.h"
+
 using namespace std;
 
 enum  PK_TYPE           {NPK, PK_H, PK_K, PK_L, PK_M}; // types of pseudoknot - NPK is Kfree structure
@@ -85,7 +87,9 @@ public:
   int GetPenalty(pk_info pki);
 };
 
-int move_PK(Pseudoknot &PKstruct, short *str, char *seq, short *s0, short *s1, int left, int right);
+int deletions_pk(Pseudoknot &PKstruct, struct_en *str, struct_en *minim);
+
+int move_PK(Pseudoknot &PKstruct, short *str, short *s0, short *s1, int left, int right);
 string pt_to_str_pk(short *str);
 int try_pk();
 #endif
