@@ -25,7 +25,7 @@ int find_lone_pair(short* str);
 void print_rates(char *filename, double temp, int num, float *energy_barr, vector<int> &output_en, bool only_saddles = false);
 
 // just encapsulation
-int move_set(struct_en &input);
+int move_set(struct_en &input, SeqInfo &sqi);
 
 
 #endif

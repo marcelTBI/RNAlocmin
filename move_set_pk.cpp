@@ -5,551 +5,750 @@
 #include <limits.h>
 #include <time.h>
 
-#include <iostream>
-
-extern "C" {
-  #include "pair_mat.h"
-  #include "fold.h"
-}
-
-#include <vector>
-#include <string>
-#include <stack>
-#include <queue>
-
 #include "move_set_pk.h"
 
-Bpair::Bpair(int left, int right)
+/* maximum degeneracy value - if degeneracy is greater than this, program segfaults*/
+#define MAX_DEGEN 100
+#define MINGAP 3
+
+#define space(a) malloc(a)
+
+#define bool int
+#define true 1
+#define false 0
+
+int compare(Structure *lhs, Structure *rhs)
 {
-  // init
-  start = left;
-  end = right;
-  next_left = left;
-  next_right = left;
+  return (*lhs)<(*rhs);
 }
 
-Bpair::Bpair()
-{
-  start = -1;
-  end = -1;
-  fprintf(stderr, "wrong initialisation ERROR\n");
-  throw;
+int find_min(Structure *arr[MAX_DEGEN], int begin, int end) {
+  Structure *min = arr[begin];
+  int min_num = begin;
+  int i;
+
+  for (i=begin+1; i<end; i++) {
+    if (compare(arr[i], min)) {
+      min = arr[i];
+      min_num = i;
+    }
+  }
+  return min_num;
 }
 
-Pseudoknot::Pseudoknot()
+int equals(const Structure *first, const Structure *second)
 {
-  type = NPK;
-  num_cross = 0;
-  energy_penalty = 0;
+  return (*first)==(*second);
 }
 
-Pseudoknot::Pseudoknot(short *str, int left):
-  Pseudoknot()
+void copy_arr(short *dest, short *src)
 {
-  while (left && str[left]==0) left--;
-  if (left==0) throw;
+  if (!src || !dest) {
+    fprintf(stderr, "Empty pointer in copying\n");
+    return;
+  }
+  memcpy(dest, src, sizeof(short)*(src[0]+1));
+}
 
-  int curr_l = min(left, (int)str[left]);
-  int curr_r = max(left, (int)str[left]);
-  int done_l = -1;
-  int done_r = -1;
-  AddBpair(curr_l, curr_r);
+short *allocopy(short *src)
+{
+  short *res = (short*) space(sizeof(short)*(src[0]+1));
+  copy_arr(res, src);
+  return res;
+}
 
-  // get all crossing pairs:
-  while (curr_l != done_l && curr_r != done_r) {
-    int l = curr_l;
-    int r = curr_r;
-    for (int i=l+1; i<r; i++) {
-      // jump over done interval
-      if (i == done_l) {
-        i = done_r;
-        continue;
+/* ############################## DECLARATION #####################################*/
+/* private functions & declarations*/
+
+static int cnt_move = 0;
+int count_move() {return cnt_move;}
+
+void print_str_pk(FILE *out, short *str);
+
+/*check if base is lone*/
+int lone_base(short *pt, int i);
+
+/* internal struct with moves, sequence, degeneracy and options*/
+typedef struct _Encoded {
+  // sequence
+  const char  *seq;
+
+  /* moves*/
+  int   bp_left;
+  int   bp_right;
+  /*int   bp_left2;   // if noLP is enabled (and for shift moves)
+  int   bp_right2;*/
+
+  /* options*/
+  //int noLP;
+  int verbose_lvl;
+  int first;
+  //int shift;
+  int all_neighs;
+
+  /* degeneracy*/
+  int begin_unpr;
+  int begin_pr;
+  int end_unpr;
+  int end_pr;
+  Structure *processed[MAX_DEGEN];
+  Structure *unprocessed[MAX_DEGEN];
+  int current_en;
+
+  /* moves in random (needs to be freed afterwards)*/
+  int *moves_from;
+  int *moves_to;
+  int num_moves;
+
+  /* function for flooding */
+  int (*funct) (Structure*, Structure*);
+} Encoded;
+
+/* frees all things allocated by degeneracy...*/
+void free_degen(Encoded *Enc)
+{
+  int i;
+  for (i=Enc->begin_unpr; i<Enc->end_unpr; i++) {
+    if (Enc->unprocessed[i]) {
+      delete Enc->unprocessed[i];
+      Enc->unprocessed[i]=NULL;
+    }
+  }
+  for (i=Enc->begin_pr; i<Enc->end_pr; i++) {
+    if (Enc->processed[i]) {
+      delete Enc->processed[i];
+      Enc->processed[i]=NULL;
+    }
+  }
+  Enc->begin_pr=0;
+  Enc->begin_unpr=0;
+  Enc->end_pr=0;
+  Enc->end_unpr=0;
+}
+
+/* ############################## IMPLEMENTATION #####################################*/
+
+
+void print_str_pk(FILE *out, short *str)
+{
+  fprintf(out, "%s", pt_to_str_pk(str).c_str());
+}
+
+inline void do_move(short *pt, int bp_left, int bp_right)
+{
+  /* delete*/
+  if (bp_left<0) {
+    pt[-bp_left]=0;
+    pt[-bp_right]=0;
+  } else { /* insert*/
+    pt[bp_left]=bp_right;
+    pt[bp_right]=bp_left;
+  }
+}
+
+/* done with all structures along the way to deepest*/
+int update_deepest(Encoded *Enc, Structure *str, Structure *min)
+{
+  /* apply move + get its energy*/
+  int tmp_en;
+  tmp_en = str->energy + str->MakeMove(Enc->bp_left, Enc->bp_right);
+
+  /* use f_point if we have it */
+  if (Enc->funct) {
+    int end = Enc->funct(str, min);
+
+    // undo moves
+    str->MakeMove(-Enc->bp_left, -Enc->bp_right);
+    Enc->bp_left=0;
+    Enc->bp_right=0;
+
+    return (end?1:0);
+  }
+
+  if (Enc->verbose_lvl>1) { fprintf(stderr, "  "); print_str_pk(stderr, str->str); fprintf(stderr, " %d\n", tmp_en); }
+
+  /* better deepest*/
+  if (tmp_en < min->energy) {
+
+    *min = *str;
+
+    /* delete degeneracy*/
+    free_degen(Enc);
+
+    /* undo moves*/
+    str->MakeMove(-Enc->bp_left, -Enc->bp_right);
+    Enc->bp_left=0;
+    Enc->bp_right=0;
+    return 1;
+  }
+
+  /* degeneracy*/
+  if ((str->energy == min->energy) && (Enc->current_en == min->energy)) {
+    int found = 0;
+    int i;
+    for (i=Enc->begin_pr; i<Enc->end_pr; i++) {
+      if (equals(Enc->processed[i], str)) {
+        found = 1;
+        break;
       }
-      // base pair
-      if (str[i]!=0) {
-        AddBpair(i, str[i]);
-        if (min(i, (int)str[i])<curr_l) curr_l = min(i, (int)str[i]);
-        if (max(i, (int)str[i])>curr_r) curr_r = max(i, (int)str[i]);
+    }
+    for (i=Enc->begin_unpr; !found && i<Enc->end_unpr; i++) {
+      if (equals(Enc->unprocessed[i], str)) {
+        found = 1;
+        break;
       }
     }
 
-    done_l = l;
-    done_r = r;
-  }
-}
-
-int Pseudoknot::AddBpair(int left, int right)
-{
-  // check for duplicity
-  if (points.find(left)!=points.end()) return 0;
-  if (left > right) swap(left, right);
-
-  // create new:
-  Bpair new_bp(left, right);
-
-  // some helpers
-  int left_reach = 0; // left reach of the nesting - where can I furthest go with nestings
-  int right_reach = INT_MAX; // right --||--
-
-  // find crossings and nestings
-  std::pair<const int, int> pr(left, 0);
-  map<int, int>::iterator it = lower_bound(points.begin(), points.end(), pr); // get first point inside the basepair
-  for (; it!=points.end() && it->first<=right; it++) {
-    int l = it->second;
-    int r = bpairs[it->second].end;
-
-    // 3 options:
-    if (l<left && r<right) { //left cross
-      new_bp.left_cross.insert(l);
-      left_reach = max(left_reach, l);
-    } else if (l>left && r>right) { // right cross
-      new_bp.right_cross.insert(l);
-      right_reach = min(right_reach, r);
-    } else if (l>left && r<right) { // nested, need to resolve left sibling later
-      // we will not keep info other than next right next left
-      if (new_bp.next_right == left) new_bp.next_right = l;
+    if (!found) {
+      //print_stren(stderr, str); // fprintf(stderr, " %6.2f\n", str->energy);
+      Enc->unprocessed[Enc->end_unpr] = new Structure(*str);
+      Enc->end_unpr++;
     }
   }
 
-  // left_most missing only: (we are searching in (left_reach, left) region backwards)
-  std::pair<const int, int> pr2(left, 0);
-  map<int, int>::reverse_iterator rit (lower_bound(points.begin(), points.end(), pr2));
-  for (; rit!=points.rend() && rit->first>left_reach; rit++) {
-    int l = rit->second;
-    int r = bpairs[rit->second].end;
-
-    // check if it is nested.
-    if (l<left && l>left_reach && r>right && r<right_reach) {
-      new_bp.next_left = l;
-      break;
-    }
-  }
-
-  // now insert it into the structure
-  bpairs.insert(make_pair(left, new_bp));
-  num_cross += new_bp.left_cross.size() + new_bp.right_cross.size();
-
-  // update points
-  points[left] = left;
-  points[right] = left;
-
-  // update nested list:
-  if (new_bp.next_left != left) {
-    bpairs[new_bp.next_left].next_right = left;
-  }
-  if (new_bp.next_right != left) {
-    bpairs[new_bp.next_right].next_left = left;
-  }
-
-  // update crossings lists:
-  for (set<int>::iterator it = new_bp.left_cross.begin(); it!=new_bp.left_cross.end(); it++) {
-    bpairs[*it].right_cross.insert(left);
-  }
-  for (set<int>::iterator it = new_bp.right_cross.begin(); it!=new_bp.right_cross.end(); it++) {
-    bpairs[*it].left_cross.insert(left);
-  }
-
-  // do we change type? and energy penalty
-    //-- still has to be done
-  // non nested:
-  if (new_bp.next_left == left && new_bp.next_right == left) {
-    // maybe the type of PK has changed...
-    // now just S->H and H -> nonH (disabled)
-    bool nonH = false;
-    if (new_bp.left_cross.size()>0 && new_bp.right_cross.size()>0) {
-      nonH = true;
-    }
-    for (set<int>::iterator it = new_bp.left_cross.begin(); it!=new_bp.left_cross.end(); it++) {
-      if (bpairs[*it].left_cross.size()>0) nonH = true;
-    }
-    for (set<int>::iterator it = new_bp.right_cross.begin(); it!=new_bp.right_cross.end(); it++) {
-      if (bpairs[*it].right_cross.size()>0) nonH = true;
-    }
-    // non-allowed
-    if (nonH) {
-      RemoveBpair(left);
-      return 0;
-    }
-    // S->H
-    if (type == NPK && num_cross>0) {
-      type = PK_H;
-
-      // constant penalty
-      int tmp = -energy_penalty + beta1_pen[type];
-      energy_penalty = beta1_pen[type];
-
-      // penalty for unpaired and stuff
-      pki = FindPKrange(left);
-      energy_penalty2 = GetPenalty(pki);
-      tmp += energy_penalty2;
-
-      return tmp;
-    }
-  } else if (type == PK_H) {  // nested.
-    pki.num_bp ++;
-    if (pki.start>left) pki.start = left;
-    if (pki.end<right) pki.end = right;
-    int tmp = -energy_penalty2 + GetPenalty(pki);
-    energy_penalty2 += tmp;
-
-    return tmp;
-  }
+  /* undo moves*/
+  str->MakeMove(-Enc->bp_left, -Enc->bp_right);
+  Enc->bp_left=0;
+  Enc->bp_right=0;
   return 0;
 }
-int Pseudoknot::RemoveBpair(int left)
+
+
+/* deletions move set*/
+int deletions_pk(Encoded *Enc, Structure *str, Structure *minim)
 {
-  map<int, Bpair>::iterator to_remove;
-  int tmp = 0;
-  // check existence
-  if ((to_remove = bpairs.find(left))!=bpairs.end()) {
-    Bpair &rem_bp = to_remove->second;
-    num_cross -= rem_bp.left_cross.size();
-    num_cross -= rem_bp.right_cross.size();
+  int cnt = 0;
+  short *pt = str->str;
+  int len = pt[0];
+  int i;
 
-    // remove the crosings:
-    for (set<int>::iterator it = rem_bp.left_cross.begin(); it!=rem_bp.left_cross.end(); it++) {
-      bpairs[*it].right_cross.erase(left);
+  for (i=1; i<=len; i++) {
+    if (pt[i] && pt[i]>i) {  /* '('*/
+      Enc->bp_left=-i;
+      Enc->bp_right=-pt[i];
+
+
+      cnt += update_deepest(Enc, str, minim);
+      /* in case useFirst is on and structure is found, end*/
+      if (Enc->first && cnt > 0) return cnt;
     }
-    for (set<int>::iterator it = rem_bp.right_cross.begin(); it!=rem_bp.right_cross.end(); it++) {
-      bpairs[*it].left_cross.erase(left);
+  }
+  return cnt;
+}
+
+  /* compatible base pair?*/
+inline bool compat(char a, char b) {
+  if (a=='A' && b=='U') return true;
+  if (a=='C' && b=='G') return true;
+  if (a=='G' && b=='U') return true;
+  if (a=='U' && b=='A') return true;
+  if (a=='G' && b=='C') return true;
+  if (a=='U' && b=='G') return true;
+  /* and with T's*/
+  if (a=='A' && b=='T') return true;
+  if (a=='T' && b=='A') return true;
+  if (a=='G' && b=='T') return true;
+  if (a=='T' && b=='G') return true;
+  return false;
+}
+
+/* try insert base pair (i,j)*/
+inline bool try_insert(const short *pt, const char *seq, int i, int j)
+{
+  if (i<=0 || j<=0 || i>pt[0] || j>pt[0]) return false;
+  return (j-i>MINGAP && pt[j]==0 && pt[i]==0 && compat(seq[i-1], seq[j-1]));
+}
+
+// try insert base pair (i,j)
+inline bool try_insert_seq(const char *seq, int i, int j)
+{
+  if (i<=0 || j<=0) return false;
+  return (j-i>MINGAP && compat(seq[i-1], seq[j-1]));
+}
+
+/* insertions move set*/
+int insertions_pk(Encoded *Enc, Structure *str, Structure *minim)
+{
+  int cnt = 0;
+  short *pt = str->str;
+  int len = pt[0];
+  int i,j;
+
+  for (i=1; i<=len; i++) {
+    if (pt[i]==0) {
+      for (j=i+1; j<=len; j++) {
+        /* end if found closing bracket*/
+        //if (pt[j]!=0 && pt[j]<j) break;  //')'
+        /*if (pt[j]!=0 && pt[j]>j) {       //'('
+          j = pt[j];
+          continue;
+        }*/
+        /* if conditions are met, do insert*/
+        if (try_insert(pt, Enc->seq, i, j)) {
+          INS_FLAG iflag = str->CanInsert(i, j);
+          if (iflag != NO_INS && (Enc->all_neighs || iflag == REG_INS || iflag == INSIDE_PK)) {
+            Enc->bp_left=i;
+            Enc->bp_right=j;
+
+            //fprintf(stderr, "CI: %4d %4d\n", i, j);
+
+
+            cnt += update_deepest(Enc, str, minim);
+            /* in case useFirst is on and structure is found, end*/
+            if (Enc->first && cnt > 0) return cnt;
+          } else  {
+            str->str[i] = j;
+            str->str[j] = i;
+            //fprintf(stdout, "%s    BAD\n", pt_to_str_pk(str->str).c_str());
+            str->str[i] = 0;
+            str->str[j] = 0;
+          }
+        }
+      }
     }
+  }
+  return cnt;
+}
 
-    // update nested list:
-    if (rem_bp.next_left != left) {
-      Bpair &update = bpairs[rem_bp.next_left];
-      if (rem_bp.next_right == rem_bp.start) {
-        update.next_right = update.start;
-      } else update.next_right = rem_bp.next_right;
-    }
-    if (rem_bp.next_right != left) {
-      Bpair &update = bpairs[rem_bp.next_right];
-      if (rem_bp.next_left == rem_bp.start) {
-        update.next_left = update.start;
-      } else update.next_left = rem_bp.next_left;
-    }
+/* move to deepest (or first) neighbour*/
+int move_set(Encoded *Enc, Structure *str_in)
+{
+  /* count how many times called*/
+  cnt_move++;
 
-    // was nested?
-    bool nested = false;
-    if (rem_bp.next_left!=left || rem_bp.next_right!=left) {
-      nested = true;
-    }
+  /* count better neighbours*/
+  int cnt = 0;
 
-    // now reset type:
-     // still TODO!!!
-      //now just H -> S:
-    if (num_cross == 0) {
-      type = NPK;
-      tmp = -energy_penalty + beta1_pen[type];
-      energy_penalty = beta1_pen[type];
+  /* deepest descent*/
+  Structure *str = new Structure(*str_in);
+  Structure *min = new Structure(*str);
+  Enc->current_en = str->energy;
 
-      tmp -= energy_penalty2;
-      energy_penalty2 = 0;
+  if (Enc->verbose_lvl>0) { fprintf(stderr, "  start of MS:\n  "); print_str_pk(stderr, str->str); fprintf(stderr, " %d\n\n", str->energy); }
 
+  /* if using first dont do all of them*/
+  bool end = false;
+  /* insertions*/
+  if (!end) cnt += insertions_pk(Enc, str, min);
+  if (Enc->first && cnt>0) end = true;
+  if (Enc->verbose_lvl>1) fprintf(stderr, "\n");
+
+  /* deletions*/
+  if (!end) cnt += deletions_pk(Enc, str, min);
+  if (Enc->first && cnt>0) end = true;
+
+  /* if degeneracy occurs, solve it!*/
+  if (!end && (Enc->end_unpr - Enc->begin_unpr)>0) {
+    Enc->processed[Enc->end_pr] = str;
+    Enc->end_pr++;
+    str = Enc->unprocessed[Enc->begin_unpr];
+    Enc->unprocessed[Enc->begin_unpr]=NULL;
+    Enc->begin_unpr++;
+    delete min;
+    cnt += move_set(Enc, str);
+  } else {
+    /* write output to str*/
+    *str = *min;
+    delete min;
+  }
+
+  /* resolve degeneracy in local minima*/
+  if ((Enc->end_pr - Enc->begin_pr)>0) {
+    Enc->processed[Enc->end_pr]=str;
+    Enc->end_pr++;
+
+    int min = find_min(Enc->processed, Enc->begin_pr, Enc->end_pr);
+    Structure *tmp = Enc->processed[min];
+    Enc->processed[min] = Enc->processed[Enc->begin_pr];
+    Enc->processed[Enc->begin_pr] = tmp;
+    str = Enc->processed[Enc->begin_pr];
+    Enc->begin_pr++;
+    free_degen(Enc);
+  }
+
+  if (Enc->verbose_lvl>1 && !(Enc->first)) { fprintf(stderr, "\n  end of MS:\n  "); print_str_pk(stderr, str->str); fprintf(stderr, " %d\n\n", str->energy); }
+
+  *str_in = *str;
+  delete str;
+
+  return cnt;
+}
+
+void construct_moves(Encoded *Enc, short *structure)
+{
+  /* generate all possible moves (less than n^2)*/
+  Enc->num_moves = 0;
+  int i;
+  for (i=1; i<=structure[0]; i++) {
+    if (structure[i]!=0) {
+      if (structure[i]<i) continue;
+      Enc->moves_from[Enc->num_moves]=-i;
+      Enc->moves_to[Enc->num_moves]=-structure[i];
+      Enc->num_moves++;
+      //fprintf(stderr, "add  d(%d, %d)\n", i, str.structure[i]);
     } else {
-      // reevaluate the energy_penalty2:
-      pki.num_bp --;
-      if (!nested) pki.num_nn_bp--; // wont happen now
-      // adjust the beginning and end?
-      if (pki.start == left) {
-        pki.start = (++FirstPoint(left))->first;  // maybe wrong for another PK types
+      int j;
+      for (j=i+1; j<=structure[0]; j++) {
+        //fprintf(stderr, "check (%d, %d)\n", i, j);
+        if (structure[j]==0) {
+          if (try_insert_seq(Enc->seq,i,j)) {
+            Enc->moves_from[Enc->num_moves]=i;
+            Enc->moves_to[Enc->num_moves]=j;
+            Enc->num_moves++;
+            //fprintf(stderr, "add  i(%d, %d)\n", i, j);
+            continue;
+          }
+        } /*else if (structure[j]>j) { // '('
+          j = structure[j];
+        } else break;*/
       }
-
-      if (pki.end == rem_bp.end) {
-        pki.end = (--FirstPoint(rem_bp.end))->first;
-      }
-
-      tmp = -energy_penalty2 + GetPenalty(pki);
-      energy_penalty2 += tmp;
     }
-
-    // update points:
-    points.erase(left);
-    points.erase(rem_bp.end);
-
-    // erase the base pair
-    bpairs.erase(to_remove);
-
   }
-  return tmp;
+
+  /* permute them */
+  for (i=0; i<Enc->num_moves-1; i++) {
+    int rnd = rand();
+    rnd = rnd % (Enc->num_moves-i) + i;
+    int swp;
+    swp = Enc->moves_from[i];
+    Enc->moves_from[i]=Enc->moves_from[rnd];
+    Enc->moves_from[rnd]=swp;
+    swp = Enc->moves_to[i];
+    Enc->moves_to[i]=Enc->moves_to[rnd];
+    Enc->moves_to[rnd]=swp;
+  }
 }
 
-// helpers
-int Pseudoknot::Start() {
-  if (points.size()==0) return 0;
-  return points.begin()->first;
-}
-
-int Pseudoknot::End() {
-  if (points.size()==0) return 0;
-  return points.rbegin()->first;
-}
-
-int Pseudoknot::Clear() {
-  points.clear();
-  bpairs.clear();
-  type = NPK;
-  int tmp = -energy_penalty + beta1_pen[type];
-  energy_penalty = beta1_pen[type];
-  return tmp;
-}
-
-int Pseudoknot::GetPenalty(pk_info pki)
+int move_rset(Encoded *Enc, Structure *str_in)
 {
-  int unpaired = pki.end - pki.start + 1 - 2*pki.num_bp;
-  return unpaired * beta3_pen[type] + pki.num_nn_bp * beta2_pen[type];
+  /* count how many times called*/
+  cnt_move++;
+
+  /* count better neighbours*/
+  int cnt = 0;
+
+  /* deepest descent*/
+  Structure *str = new Structure(*str_in);
+  Structure *min = new Structure(*str);
+  Enc->current_en = str->energy;
+
+  if (Enc->verbose_lvl>0) { fprintf(stderr, "  start of MR:\n  "); print_str_pk(stderr, str->str); fprintf(stderr, " %d\n\n", str->energy); }
+
+  // construct and permute possible moves
+  construct_moves(Enc, str->str);
+
+  /* find first the lower one*/
+  int i;
+  for (i=0; i<Enc->num_moves; i++) {
+    Enc->bp_left = Enc->moves_from[i];
+    Enc->bp_right = Enc->moves_to[i];
+    cnt = update_deepest(Enc, str, min);
+    if (cnt) break;
+  }
+
+  /* if degeneracy occurs, solve it!*/
+  if (!cnt && (Enc->end_unpr - Enc->begin_unpr)>0) {
+    Enc->processed[Enc->end_pr] = str;
+    Enc->end_pr++;
+    str = Enc->unprocessed[Enc->begin_unpr];
+    Enc->unprocessed[Enc->begin_unpr]=NULL;
+    Enc->begin_unpr++;
+    delete min;
+    cnt += move_rset(Enc, str);
+  } else {
+    /* write output to str*/
+
+    *str = *min;
+    delete min;
+  }
+
+  /* resolve degeneracy in local minima*/
+  if ((Enc->end_pr - Enc->begin_pr)>0) {
+    Enc->processed[Enc->end_pr]=str;
+    Enc->end_pr++;
+
+    int min = find_min(Enc->processed, Enc->begin_pr, Enc->end_pr);
+    Structure *tmp = Enc->processed[min];
+    Enc->processed[min] = Enc->processed[Enc->begin_pr];
+    Enc->processed[Enc->begin_pr] = tmp;
+    str = Enc->processed[Enc->begin_pr];
+    Enc->begin_pr++;
+    free_degen(Enc);
+  }
+
+  *str_in = *str;
+  delete str;
+
+  return cnt;
 }
 
-map<int, int>::iterator Pseudoknot::FirstPoint(int point)
+/*check if base is lone*/
+int lone_base(short *pt, int i)
 {
-  std::pair<const int, int> pr(point, 0);
-  return lower_bound(points.begin(), points.end(), pr);
+  if (i<=0 || i>pt[0]) return 0;
+  /* is not a base pair*/
+  if (pt[i]==0) return 0;
+
+  /* base is lone:*/
+  if (i-1>0) {
+    /* is base pair and is the same bracket*/
+    if (pt[i-1]!=0 && ((pt[i-1]<pt[pt[i-1]]) == (pt[i]<pt[pt[i]]))) return 0;
+  }
+
+  if (i+1<=pt[0]) {
+    if (pt[i+1]!=0 && ((pt[i-1]<pt[pt[i-1]]) == (pt[i]<pt[pt[i]]))) return 0;
+  }
+
+  return 1;
 }
 
-int Pseudoknot::ClearNeighsOfBP(short *str, int left)
+int move_standard_pk_pt(Structure *str,
+                  enum MOVE_TYPE type,
+                  int verbosity_level)
 {
-  int res = 0;
-  auto it = bpairs.find(abs(left));
-  if (it==bpairs.end()) {
-    return -1;
+  switch (type){
+  case GRADIENT: move_gradient_pk(str, verbosity_level); break;
+  case FIRST: move_first_pk(str, verbosity_level); break;
+  case ADAPTIVE: move_adaptive_pk(str, verbosity_level); break;
   }
 
-  Bpair &bp = it->second;
-  for (auto sit=bp.left_cross.begin(); sit!=bp.left_cross.end(); sit++) {
-    str[*sit] = 0;  // start
-    str[bpairs[*sit].end] = 0; // end
-    res++;
-  }
-  for (auto sit=bp.right_cross.begin(); sit!=bp.right_cross.end(); sit++) {
-    str[*sit] = 0;  // start
-    str[bpairs[*sit].end] = 0; // end
-    res++;
-  }
-
-  return res;
+  return str->energy;
 }
 
-int Pseudoknot::AddNeighsOfBP(short *str, int left)
+int move_standard_pk(char *seq,
+                  char *struc,
+                  enum MOVE_TYPE type,
+                  int verbosity_level)
 {
-  int res = 0;
-  auto it = bpairs.find(abs(left));
-  if (it==bpairs.end()) return -1;
+  Structure *str = new Structure(seq, struc);
 
-  Bpair &bp = it->second;
-  for (auto sit=bp.left_cross.begin(); sit!=bp.left_cross.end(); sit++) {
-    int end = bpairs[*sit].end;
-    str[*sit] = end;  // start
-    str[end] = *sit; // end
-    res++;
-  }
-  for (auto sit=bp.right_cross.begin(); sit!=bp.right_cross.end(); sit++) {
-    int end = bpairs[*sit].end;
-    str[*sit] = end;  // start
-    str[end] = *sit; // end
-    res++;
-  }
+  int energy = move_standard_pk_pt(str, type, verbosity_level);
 
-  return res;
-}
-
-int move_PK(Pseudoknot &PKstruct, short *str, short *s0, short *s1, int left, int right)
-{
-  //init
-  bool deletion = (left<0);
-  int energy = 0;
-  int tmp_pk = 0;
-  int tmp_em = 0;
-
-  // deletion
-  if (deletion) {
-    // first remove it from struct
-    str[-left] = 0;
-    str[-right] = 0;
-
-    // now recompute the energy
-    // energy_of_move energy: (here we ask only for insertion energy: if deletion, then we perform deletion and ask for energy of reinsertion)
-    // first we have to remove all conflicting edges:
-    int removed = PKstruct.ClearNeighsOfBP(str, -left);
-    //fprintf(stderr, "%s cleared=%d\n", pt_to_str_pk(str).c_str(), removed);
-    tmp_em = -energy_of_move_pt(str, s0, s1, -left, -right);
-    int added = PKstruct.AddNeighsOfBP(str, -left);
-    //fprintf(stderr, "%s added=%d (%8.2F)\n", pt_to_str_pk(str).c_str(), added, energy/100.0);
-
-    //at last update pseudoknot
-    tmp_pk = PKstruct.RemoveBpair(-left);
-    //energy += tmp_en;
-
-  } else { // insertion
-    // first update the Pseudoknot
-    tmp_pk = PKstruct.AddBpair(left, right);
-    //energy += tmp_en;
-
-    // energy_of_move energy: (here we ask only for insertion energy: if deletion, then we perform deletion and ask for energy of reinsertion)
-      // first we have to remove all conflicting edges:
-    int removed = PKstruct.ClearNeighsOfBP(str, left);
-    //fprintf(stderr, "%s cleared=%d\n", pt_to_str_pk(str).c_str(), removed);
-    tmp_em = energy_of_move_pt(str, s0, s1, left, right);
-    int added = PKstruct.AddNeighsOfBP(str, left);
-    //fprintf(stderr, "%s added=%d (%8.2F)\n", pt_to_str_pk(str).c_str(), added, energy/100.0);
-
-
-    // lastly, update structure
-    str[left] = right;
-    str[right] = left;
-  }
-
-  energy += tmp_em + tmp_pk;
-
-  fprintf(stderr, "energy change: %6.2f (pk %6.2f) (em %6.2f)\n", energy/100.0, tmp_pk/100.0, tmp_em/100.0);
+  pt_to_chars_pk(str->str, struc);
+  delete str;
 
   return energy;
 }
 
-string pt_to_str_pk(short *str)
+int move_gradient_pk(Structure *str,
+                  int verbosity_level)
 {
-  // we can do with 4 types now:
-  const int maxp = 4;
-  const char ptl[] = {"([{<"};
-  const char ptr[] = {")]}>"};
+  cnt_move = 0;
 
-  // result:
-  string res;
-  res.reserve(str[0]);
+  Encoded enc;
+  enc.seq = str->seq;
 
-  // stack of end points of each parenthesis
-  vector<stack<int> > pars(maxp);
+  /* moves*/
+  enc.bp_left=0;
+  enc.bp_right=0;
 
-  // temprary structure
-  vector<int> tmp(str[0]+1, 0);
+  /* options*/
+  enc.verbose_lvl=verbosity_level;
+  enc.first=0;
+  enc.all_neighs=0;
 
-  // precomputation
-  for (int i=1; i<=str[0]; i++) {
-    if (str[i]>i) {
-      int j=0;
-      //fprintf(stderr, "%d %d \n", (int)pars[j].size(), pars[j].empty());
-      while (j<maxp && !pars[j].empty() && pars[j].top()<str[i]) {
-        j++;
-      }
-      if (j==maxp) {
-        fprintf(stderr, "Cannot print it with %d types of parentheses!!!\n", maxp);
-        throw;
-        return res;
-      } else {
-        // jth parenthesis:
-        pars[j].push(str[i]);
-        tmp[i] = j;
-        tmp[str[i]] = j;
-      }
-    } else if (str[i]>0 && str[i]<i) {
-      pars[tmp[i]].pop();
-    }
+  /* degeneracy*/
+  enc.begin_unpr=0;
+  enc.begin_pr=0;
+  enc.end_unpr=0;
+  enc.end_pr=0;
+  enc.current_en=0;
+
+  // function
+  enc.funct=NULL;
+
+  int i;
+  for (i=0; i<MAX_DEGEN; i++) enc.processed[i]=enc.unprocessed[i]=NULL;
+
+  /*struct_en str;
+  str.structure = allocopy(ptable);
+  str.energy = energy_of_structure_pt(enc.seq, str.structure, enc.s0, enc.s1, 0);
+*/
+
+  while (move_set(&enc, str)!=0) {
+    free_degen(&enc);
   }
+  free_degen(&enc);
 
-  // filling the result:
-  for (int i=1; i<=str[0]; i++) {
-    if (str[i]==0) res += '.';
-    else if (str[i]>i) res += ptl[tmp[i]];
-    else res += ptr[tmp[i]];
+  return str->energy;
+}
+
+int move_first_pk(Structure *str,
+                  int verbosity_level)
+{
+  cnt_move = 0;
+
+  Encoded enc;
+  enc.seq = str->seq;
+
+  /* moves*/
+  enc.bp_left=0;
+  enc.bp_right=0;
+
+  /* options*/
+  enc.verbose_lvl=verbosity_level;
+  enc.first=1;
+  enc.all_neighs=0;
+
+  /* degeneracy*/
+  enc.begin_unpr=0;
+  enc.begin_pr=0;
+  enc.end_unpr=0;
+  enc.end_pr=0;
+  enc.current_en=0;
+
+  // function
+  enc.funct=NULL;
+
+  int i;
+  for (i=0; i<MAX_DEGEN; i++) enc.processed[i]=enc.unprocessed[i]=NULL;
+
+  while (move_set(&enc, str)!=0) {
+    free_degen(&enc);
   }
-  res+='\0';
+  free_degen(&enc);
+
+  return str->energy;
+}
+
+int move_adaptive_pk(Structure *str,
+                  int verbosity_level)
+{
+  srand(time(NULL));
+
+  cnt_move = 0;
+
+  Encoded enc;
+  enc.seq = str->seq;
+
+  /* moves*/
+  enc.bp_left=0;
+  enc.bp_right=0;
+
+  /* options*/
+  enc.verbose_lvl=verbosity_level;
+  enc.first=1;
+  enc.all_neighs=0;
+
+  /* degeneracy*/
+  enc.begin_unpr=0;
+  enc.begin_pr=0;
+  enc.end_unpr=0;
+  enc.end_pr=0;
+  enc.current_en=0;
+
+  // function
+  enc.funct=NULL;
+
+  // allocate memory for moves
+  int length = str->str[0];
+  enc.moves_from = (int*) space(length*length*sizeof(int));
+  enc.moves_to = (int*) space(length*length*sizeof(int));
+
+  int i;
+  for (i=0; i<MAX_DEGEN; i++) enc.processed[i]=enc.unprocessed[i]=NULL;
+
+  while (move_rset(&enc, str)!=0) {
+    free_degen(&enc);
+  }
+  free_degen(&enc);
+
+  free(enc.moves_from);
+  free(enc.moves_to);
+
+  return str->energy;
+}
+
+int browse_neighs_pk( char *seq,
+                   char *struc,
+                   int verbosity_level,
+                   int (*funct) (Structure*, Structure*))
+
+{
+  Structure *str = new Structure(seq, struc);
+
+  int res = browse_neighs_pk_pt(str, verbosity_level, funct);
+
+  delete str;
 
   return res;
 }
-pk_info Pseudoknot::FindPKrange(int point)
+
+int browse_neighs_pk_pt( Structure *str,
+                  int verbosity_level,
+                  int (*funct) (Structure*, Structure*))
 {
-  std::pair<const int, int> pr(point, 0);
-  map<int, int>::iterator it = lower_bound(points.begin(), points.end(), pr);
+  cnt_move = 0;
 
-  // setup the stuff
-  set<int> done;
-  queue<int> not_done;
-  int startpoint = it->second;
-  //while (bpairs[startpoint].next_right != startpoint) startpoint = bpairs[startpoint].next_right;
-  not_done.push(startpoint);
-  done.insert(startpoint);
+  Encoded enc;
+  enc.seq = str->seq;
 
-  // result
-  pk_info pki;
-  pki.start = pki.end = point;
+  /* moves*/
+  enc.bp_left=0;
+  enc.bp_right=0;
 
-  while (!not_done.empty()) {
+  /* options*/
+  enc.verbose_lvl=verbosity_level;
+  enc.first=1;
+  enc.all_neighs=1;
 
-    // get next one
-    int todo = not_done.front();
-    not_done.pop();
+  /* degeneracy*/
+  enc.begin_unpr=0;
+  enc.begin_pr=0;
+  enc.end_unpr=0;
+  enc.end_pr=0;
+  enc.current_en=0;
 
-    // adjust the result
-    Bpair &bp = bpairs[todo];
-    pki.start = min(pki.start, bp.start);
-    pki.end = max(pki.end, bp.end);
-    pki.num_bp++;
-    if (bp.next_right == bp.start) pki.num_nn_bp++;
+  // function
+  enc.funct=funct;
 
-    // left cross
-    for (auto it = bp.left_cross.begin(); it!=bp.left_cross.end(); it++) {
-      if (done.count(*it)==0) {
-        not_done.push(*it);
-        done.insert(*it);
-      }
-    }
+  int i;
+  for (i=0; i<MAX_DEGEN; i++) enc.processed[i]=enc.unprocessed[i]=NULL;
 
-    // right cross
-    for (auto it = bp.right_cross.begin(); it!=bp.right_cross.end(); it++) {
-      if (done.count(*it)==0) {
-        not_done.push(*it);
-        done.insert(*it);
-      }
-    }
-  }
+  move_set(&enc, str);
+  free_degen(&enc);
 
-  return pki;
+  return str->energy;
 }
 
-int try_pk()
-{
-  char *seq = "CAAUUUUCUGAAAAUUUUCAC";
-  char *str = ".....................";
+/*
+// sample usage:
+int main() {
+  char seq[20] = "ACCCCCCTCTGTAGGGGGA";
+  char str[20] = ".((.(.........).)).";
 
-//CAAUUUUCUGAAAAUUUUCAC
-//123456789012345678901
-//:(((((::[[[))))):]]]:
+  // move to the local minimum and display it
+  int energy = move_standard(seq, str, GRADIENT, 0, 0, 0);
+  fprintf(stdout, "%s %6.2f\n\n", str, energy/100.0);
 
-  vector<std::pair<int, int> > moves;
-  moves.push_back(make_pair(2,16));
-  moves.push_back(make_pair(3,15));
-  moves.push_back(make_pair(9,20));
-  moves.push_back(make_pair(-2,-16));
-  moves.push_back(make_pair(-3,-15));
-  moves.push_back(make_pair(10,19));
-  moves.push_back(make_pair(11,17));
-  moves.push_back(make_pair(4,14));
-  moves.push_back(make_pair(-9,-20));
-  moves.push_back(make_pair(9,20));
+  //now create an array of every structure in neighbourhood of str structure
+  struct_en *list = NULL;
+  int list_length = 0;
 
-  make_pair_matrix();
-  short *pt = make_pair_table(str);
-  short *s0 = encode_sequence(seq, 0);
-  short *s1 = encode_sequence(seq, 1);
+  int get_list(struct_en *new_one, struct_en *old_one)
+  {
+    // enlarge the list
+    list_length++;
+    list = (struct_en*) realloc(list, list_length*sizeof(struct_en));
 
-  int energy = energy_of_structure_pt(seq, pt, s0, s1, 0);
+    // copy the structure
+    list[list_length-1].energy = new_one->energy;
+    list[list_length-1].structure = allocopy(new_one->structure);
 
-  Pseudoknot pk;
-  fprintf(stderr, "%s %8.3f\n", pt_to_str_pk(pt).c_str(), energy/100.0);
-  for (unsigned int i=0; i<moves.size(); i++) {
-    fprintf(stderr, "MOVE: %d %d\n", moves[i].first, moves[i].second);
-    energy += move_PK(pk, pt, s0, s1, moves[i].first, moves[i].second);
-    fprintf(stderr, "%s %8.3f\n", pt_to_str_pk(pt).c_str(), energy/100.0);
-
-    pk_info pki = pk.FindPKrange(8);
-    fprintf(stderr, "pk - %d %d %d %d \n", pki.start, pki.end, pki.num_bp, pki.num_nn_bp);
+    // we want to continue -> return 0
+    return 0;
   }
+  browse_neighs(seq, str, 0, 0, 0, get_list);
 
-  pk_info pki = pk.FindPKrange(8);
-  fprintf(stderr, "pk - %d %d %d %d \n", pki.start, pki.end, pki.num_bp, pki.num_nn_bp);
-
-  free(pt);
-  free(s0);
-  free(s1);
+  // print them and free the memory:
+  int i;
+  for (i=0; i<list_length; i++) {
+    print_stren(stdout, &list[i]);
+    free(list[i].structure);
+  }
+  free(list);
 
   return 0;
-}
+}*/
+
 

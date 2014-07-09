@@ -5,183 +5,40 @@
 #include <limits.h>
 #include <time.h>
 
+#include <stack>
+
 extern "C" {
   #include "pair_mat.h"
   #include "fold.h"
 }
 
 #include "globals.h"
+#include "move_set_pk.h"
 
 // some singleton objects
-//Degen Deg;
 Options Opt;
-Encoded Enc;
 
-// create encoded structure
-Encoded::Encoded()
+SeqInfo::SeqInfo()
 {
-  // inicialize encode_sequence
-  make_pair_matrix();
-
-  bp_left = 0;
-  bp_right = 0;
-  bp_left2 = 0;
-  bp_right2 = 0;
-
   seq = NULL;
+  s0 = s1 = NULL;
+
+  update_fold_params();
 }
 
-Encoded::~Encoded()
+SeqInfo::~SeqInfo()
 {
   if (s0) free(s0);
   if (s1) free(s1);
   if (seq) free(seq);
 }
 
-void Encoded::Init(const char *seq)
-{
-  if (this->seq) free(this->seq);
-  this->seq = (char*) space((strlen(seq)+1)*sizeof(char));
+void SeqInfo::Init(char *seq) {
+  this->seq = (char*) malloc(sizeof(char)*strlen(seq)+1);
   strcpy(this->seq, seq);
-
-  srand(time(NULL));
-
-  s0   = encode_sequence(seq, 0);
-  s1   = encode_sequence(seq, 1);
-
-
-  // just for sure:
-  int seq_len = strlen(seq);
-  short ch[seq_len+1];
-  ch[0] = seq_len;
-  for (int i=1;i<=seq_len;i++) ch[i]=0;
-  struct_en he;
-  he.structure = ch;
-  he.energy = Enc.Energy(he);
-}
-
-void Encoded::PossMoves(struct_en &str)
-{
-  moves_to.clear();
-  moves_from.clear();
-  moves_to.reserve(2*str.structure[0]);
-  moves_from.reserve(2*str.structure[0]);
-
-  // generate all possible moves (less than n^2)
-  for (int i=1; i<=str.structure[0]; i++) {
-    if (str.structure[i]!=0) {
-      if (str.structure[i]<i) continue;
-      moves_from.push_back(-i);
-      moves_to.push_back(-str.structure[i]);
-      //fprintf(stderr, "add  d(%d, %d)\n", i, str.structure[i]);
-    } else {
-      for (int j=i+1; j<=str.structure[0]; j++) {
-        //fprintf(stderr, "check (%d, %d)\n", i, j);
-        if (str.structure[j]==0) {
-          if (try_insert(seq,i,j)) {
-            moves_from.push_back(i);
-            moves_to.push_back(j);
-            //fprintf(stderr, "add  i(%d, %d)\n", i, j);
-            continue;
-          }
-        } else if (str.structure[j]>j) { // '('
-          j = str.structure[j];
-        } else break;
-      }
-    }
-  }
-}
-
-void Encoded::Permute()
-{
-    if (Opt.verbose_lvl>2) {
-    for (unsigned int i=0; i<moves_from.size(); i++) {
-      fprintf(stderr, "(%d %d) ", moves_from[i], moves_to[i]);
-    }
-    fprintf(stderr, "\n");
-  }
-  for (unsigned int i=0; i<moves_from.size()-1; i++) {
-    int rnd = rand();
-    rnd = rnd % (moves_from.size()-i) + i;
-    swap(moves_from[i], moves_from[rnd]);
-    swap(moves_to[i], moves_to[rnd]);
-  }
-
-
-}
-
-short *Encoded::Struct(const char *str)
-{
-  return make_pair_table(str);
-}
-
-int Encoded::Energy(struct_en &he)
-{
-  return energy_of_structure_pt(seq, he.structure, s0, s1, 0);
-}
-
-int Encoded::EnergyOfMove(struct_en &he)
-{
-  int tmp_en;
-  if (Opt.EOM) {
-    tmp_en = he.energy + energy_of_move_pt(he.structure, s0, s1, bp_left, bp_right);
-    Move(he, true, false);
-    if (bp_left2 != 0) {
-      tmp_en += energy_of_move_pt(he.structure, s0, s1, bp_left2, bp_right2);
-      Move(he, false, true);
-    }
-  } else {
-    Move(he);
-    tmp_en = energy_of_structure_pt(seq, he.structure, s0, s1, 0);
-  }
-  last_en = he.energy;
-  he.energy = tmp_en;
-  return tmp_en;
-}
-
-inline void do_move(short *pt, int bp_left, int bp_right)
-{
-  // delete
-  if (bp_left<0) {
-    pt[-bp_left]=0;
-    pt[-bp_right]=0;
-  } else { // insert
-    pt[bp_left]=bp_right;
-    pt[bp_right]=bp_left;
-  }
-}
-
-inline void Encoded::Move(struct_en &he, bool first, bool second)
-{
-  if (first && bp_left != 0) {
-    do_move(he.structure, bp_left, bp_right);
-  }
-  if (second && bp_left2 != 0) {
-    do_move(he.structure, bp_left2, bp_right2);
-  }
-}
-
-void Encoded::UndoMove(struct_en &he, bool first, bool second)
-{
-  if (second && bp_left2 != 0) {
-    do_move(he.structure, -bp_left2, -bp_right2);
-  }
-  if (first && bp_left != 0) {
-    do_move(he.structure, -bp_left, -bp_right);
-  }
-
-  he.energy = last_en;
-  last_en = 1e5;
-
-  Forget();
-}
-
-void Encoded::Forget()
-{
-  bp_left=0;
-  bp_right=0;
-  bp_left2=0;
-  bp_right2=0;
+  make_pair_matrix();
+  s0 = encode_sequence(seq, 0);
+  s1 = encode_sequence(seq, 1);
 }
 
 Options::Options()
@@ -259,6 +116,7 @@ int Options::Init(gengetopt_args_info &args_info)
   shift = args_info.move_arg[0]=='S';
   verbose_lvl = args_info.verbose_lvl_arg;
   floodMax = args_info.floodMax_arg;
+  pknots = args_info.pseudoknots_flag;
 
   return ret;
 }

@@ -35,9 +35,10 @@ details="\nWith -d1 only unpaired bases can participate in at most one dangling 
  treat dangling ends differently. Use -d2 in addition to -p to ensure that both algorithms use the same\
  energy model.\n\n" int default="2" optional
 option "fix-barriers"       - "Fix barrier file for interior loops (just recompute if all LM in barrier output are LM), if specified, does not need neither --previous nor --seq option" string no hidden
+option "pseudoknots"        k "Allow for pseudoknots according to \"gfold\" model - H, K, L, and M types (genus one) of pseudoknots are allowed. Slows the program substantially." flag off
 
 section "Misc"
-option "numIntervals"       - "Number of intervals for Jing's visualisation" int default="0" no
+option "numIntervals"       - "Number of intervals for Jing's visualisation" int default="0" no hidden
 option "eRange"             - "Report only LM that are in range <MFE (or lowest found LM), MFE+eRange>" float no
 option "allegiance"         - "Filename where to output the allegiance of structures. Works properly only with RNAsubopt -e list." string hidden no
 

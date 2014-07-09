@@ -75,7 +75,7 @@ void add_stats(unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs
 
     if (output.count(it->second.he) == 0) {
       fprintf(stderr, "ERROR: output does not contain structure it should!!!\n");
-      exit(EXIT_FAILURE);
+      //if (!Opt.pknots) exit(EXIT_FAILURE);
     }
     output[it->second.he] += it->second.count-1;
   }

@@ -1,0 +1,134 @@
+#ifndef __PKNOTS_H
+#define __PKNOTS_H
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <limits.h>
+
+#include <vector>
+#include <set>
+#include <map>
+#include <string>
+
+extern "C" {
+  #include "data_structures.h"
+}
+
+enum BPAIR_TYPE {N_S, N_M, P_H, P_K, P_L, P_M, ROOT};
+const char bpair_type_name[][5] = {"S", "M", "P_H", "P_K", "P_L", "P_M", "ROOT"};
+const char bpair_type_sname[] = "smHKLM_";
+const int beta1_pen[] =   {0,    0,  960, 1160, 1360, 1660,    0};  // simple pk penalty
+const int beta1mp_pen[] = {0,    0, 1500, 1700, 1900, 2200,    0};  // pk in a multiloop
+const int beta2_pen[] =   {0,    0,   10,   10,   10,   10,    0};  // penalty for a single un
+const int beta3_pen[] =   {0,    0,   10,   10,   10,   10,    0};
+
+short *make_pair_table_PK(const char *str);
+std::string pt_to_str_pk(const short *str);
+char* pt_to_chars_pk(const short *str);
+void pt_to_chars_pk(const short *str, char *dest);
+
+int Contains_PK(short *str);
+
+//debug
+float get_eos_time();
+
+class Pseudoknot
+{
+public:
+  bool imat[4][4];
+  std::set<int> parts[4];
+  int size;
+public:
+  // contains some bpair?
+  bool Contains(int left);
+
+  // crosses this bpair?
+  //bool Cross(short *str, int left, int right);
+
+  // can we insert it inside?
+  int Inside(short *str, int left, int right);
+
+  // can we insert it normally?
+  bool CanInsert(int left, std::vector<int> &numbers, bool insert = false);
+
+  // delete a bpair:
+  bool Delete(int left);
+
+  inline bool Imat(int a, int b) {
+    return a>b?imat[b][a]:imat[a][b];
+  }
+
+  // constructor
+  Pseudoknot();
+  Pseudoknot(const Pseudoknot &pknot);
+
+  Pseudoknot &operator=(const Pseudoknot &pknot);
+};
+
+enum INS_FLAG {NO_INS, REG_INS, INSIDE_PK, CREATE_PK, CHNG_PK};
+
+class Structure {
+  // pknots:
+  std::vector<Pseudoknot> pknots;
+
+  // map bpairs to pknots or nothing if the bpair is standard
+  std::map<int, int> bpair_pknot;
+
+public:
+  // old-school structure
+  short *str;
+  char *seq;
+
+  // energy:
+  int energy;
+
+public:
+  // constructor
+  Structure(char *seq, short *structure);
+  Structure(char *seq, char *structure);
+  Structure(Structure &second);
+  ~Structure();
+
+  inline Pseudoknot *Pknot_index(int index) {
+    if (index == -1) return NULL;
+    return &pknots[index];
+  }
+
+  inline Pseudoknot *Pknot_bpair(int index) {
+    return Pknot_index(bpair_pknot[index]);
+  }
+
+  bool const operator<(const Structure &second) const;
+  bool const operator==(const Structure &second) const;
+  Structure &operator=(Structure &second);
+private:
+  // is the bpair viable?
+  INS_FLAG ViableInsert(int left, int right, bool insert = false);
+  INS_FLAG Insert(int left, int right);
+  bool Delete(int left);
+public:
+  // do a move
+  int MakeMove(int left, int right);
+
+  INS_FLAG CanInsert(int left, int right);
+};
+
+class Helpers {
+public:
+  std::vector<int> str_energy;
+  std::vector<BPAIR_TYPE> str_type;
+  std::vector<int> str_torght;
+  std::vector<int> str_toleft;
+  int last_open;
+
+  void Create(int length);
+  Helpers(int length);
+};
+
+int energy_of_struct_pk(char *seq, char *structure, int verbose = 0);
+int energy_of_struct_pk(char *seq, short *structure, int verbose = 0);
+int energy_of_struct_pk(char *seq, short *structure, short *s0, short *s1, int verbose = 0);
+void freeP(); // cleanup - run after last call of energy_of_struct - not necessary
+
+
+#endif

@@ -100,15 +100,12 @@ struct barr_info { // info taken from barriers
 
 // functions that are down in file ;-)
 char *read_seq(char *seq_arg, char **name_out);
-int move(unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs, map<struct_en, int, comps_entries> &output, set<struct_en, comps_entries> &output_shallow);
+int move(unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs, map<struct_en, int, comps_entries> &output, set<struct_en, comps_entries> &output_shallow, SeqInfo &sqi);
 char *read_previous(char *previous, map<struct_en, int, comps_entries> &output);
 char *read_barr(char *previous, map<struct_en, barr_info, comps_entries> &output);
 
 int main(int argc, char **argv)
 {
-  try_pk();
-  exit(1);
-
   clock_t clck1 = clock();
 
   // parse arguments
@@ -141,6 +138,9 @@ int main(int argc, char **argv)
     set_model_details(&md);
     md.dangles = dangles;
   }
+
+  //try_pk();
+  //exit(0);
 
   // keep track of structures & statistics
   map<struct_en, int, comps_entries> output; // structures plus energies to output (+ how many hits has this minima)
@@ -182,7 +182,8 @@ int main(int argc, char **argv)
 
   // ########################## begin main loop - reads structures from RNAsubopt and process them
   int count = max(output.size(), output_barr.size());  //num of local minima
-  Enc.Init(seq);
+  SeqInfo sqi;
+  sqi.Init(seq);
 
   int not_canonical = 0;
 
@@ -190,7 +191,7 @@ int main(int argc, char **argv)
     // hash
     unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> structs (HASHSIZE); // structures to minima map
     while (!args_info.find_num_given || count != args_info.find_num_arg) {
-      int res = move(structs, output, output_shallow);
+      int res = move(structs, output, output_shallow, sqi);
 
       // first print out
       if (Opt.verbose_lvl>0 && num_moves%10000==0) fprintf(stderr, "processed %d, minima %d, time %f secs.\n", num_moves, count, (clock()-clck1)/(double)CLOCKS_PER_SEC);
@@ -240,7 +241,7 @@ int main(int argc, char **argv)
         // first check if the output is not shallow
         if (Opt.minh>0) {
           int saddle;
-          struct_en *escape = flood(it->first, saddle, Opt.minh);
+          struct_en *escape = flood(it->first, sqi, saddle, Opt.minh);
 
           if (args_info.verbose_lvl_arg>0 && ii%100 == 0) {
             fprintf(stderr, "non-shallow remained: %d / %d; time: %.2f secs.\n", i, ii, (clock()-clck1)/(double)CLOCKS_PER_SEC);
@@ -249,7 +250,7 @@ int main(int argc, char **argv)
           // shallow
           if (escape) {
             if (args_info.verbose_lvl_arg>1) {
-              fprintf(stderr, "shallow: %s %6.2f (saddle: %s %6.2f)\n", pt_to_str(it->first.structure).c_str(), it->first.energy/100.0, pt_to_str(escape->structure).c_str(), escape->energy/100.0);
+              fprintf(stderr, "shallow: %s %6.2f (saddle: %s %6.2f)\n", pt_to_str_pk(it->first.structure).c_str(), it->first.energy/100.0, pt_to_str_pk(escape->structure).c_str(), escape->energy/100.0);
             }
             free_se(escape);
             free(it->first.structure);
@@ -257,8 +258,8 @@ int main(int argc, char **argv)
           }
         }
 
-        if (args_info.verbose_lvl_arg > 2) fprintf(stderr, "%4d %s %6.2f\n", i, pt_to_str(it->first.structure).c_str(), it->first.energy/100.0);
-        output_str[i]=pt_to_str(it->first.structure);
+        if (args_info.verbose_lvl_arg > 2) fprintf(stderr, "%4d %s %6.2f\n", i, pt_to_str_pk(it->first.structure).c_str(), it->first.energy/100.0);
+        output_str[i]=pt_to_str_pk(it->first.structure);
         output_num[i]=it->second;
         output_he[i]=it->first;
         output_en[i]=it->first.energy;
@@ -276,7 +277,7 @@ int main(int argc, char **argv)
     // allegiance:
     if (allegiance) {
       for (int i=0; i<(int)structures.size(); i++) {
-        fprintf(alleg, "%6d %s %6.2f %6d\n", i+1, pt_to_str(structures[i].structure).c_str(), structures[i].energy/100.0, LM_to_LMnum[str_to_LM[structures[i]]]);
+        fprintf(alleg, "%6d %s %6.2f %6d\n", i+1, pt_to_str_pk(structures[i].structure).c_str(), structures[i].energy/100.0, LM_to_LMnum[str_to_LM[structures[i]]]);
         //free(structures[i].structure);
       }
       structures.clear();
@@ -285,7 +286,7 @@ int main(int argc, char **argv)
     }
 
     // erase possible NULL elements...
-    if (args_info.noSort_flag) {
+    /*if (args_info.noSort_flag) {
       for (int j=output_he.size()-1; j>=0; j--) {
         if (output_he[j].structure==NULL) {
           output_he.erase(output_he.begin()+j);
@@ -294,12 +295,12 @@ int main(int argc, char **argv)
           output_num.erase(output_num.begin()+j);
         }
       }
-    } else {
+    } else {*/
       output_he.resize(i);
       output_str.resize(i);
       output_en.resize(i);
       output_num.resize(i);
-    }
+    //}
 
     // time?
     if (args_info.verbose_lvl_arg>0) {
@@ -347,7 +348,7 @@ int main(int argc, char **argv)
           if (args_info.verbose_lvl_arg>2) fprintf(stderr,   "flooding  (%3d): %s %.2f\n", i, output_str[i].c_str(), output_he[i].energy/100.0);
 
           int saddle;
-          struct_en *he = flood(output_he[i], saddle);
+          struct_en *he = flood(output_he[i], sqi, saddle);
 
           // print info
           if (args_info.verbose_lvl_arg>1) {
@@ -355,7 +356,7 @@ int main(int argc, char **argv)
               fprintf(stderr, "below     (%3d): %s %.2f\n"
                               "en: %7.2f  is: %s %.2f\n", i,
                       output_str[i].c_str(), output_he[i].energy/100.0, saddle/100.0,
-                      pt_to_str(he->structure).c_str(), he->energy/100.0);
+                      pt_to_str_pk(he->structure).c_str(), he->energy/100.0);
             } else {
               fprintf(stderr, "unsucesful(%3d): %s %.2f\n", i,
                       output_str[i].c_str(), output_he[i].energy/100.0);
@@ -364,13 +365,13 @@ int main(int argc, char **argv)
           // if flood succesfull - walk down to find father minima
           if (he) {
             // walk down
-            move_set(*he);
+            move_set(*he, sqi);
 
             // now check if we have the minimum already (hopefuly yes ;-) )
             vector<struct_en>::iterator it;
             it = lower_bound(output_he.begin(), output_he.end(), *he, compf_entries2);
 
-            if (args_info.verbose_lvl_arg>1) fprintf(stderr, "minimum: %s %.2f\n", pt_to_str(he->structure).c_str(), he->energy/100.0);
+            if (args_info.verbose_lvl_arg>1) fprintf(stderr, "minimum: %s %.2f\n", pt_to_str_pk(he->structure).c_str(), he->energy/100.0);
             // we dont need it again
             free_se(he);
 
@@ -522,7 +523,7 @@ int main(int argc, char **argv)
       }
       const struct_en &he = it->first;
       barr_info &bi = it->second;
-      printf("%4d %s %6.2f", i, pt_to_str(he.structure).c_str(), he.energy/100.0);
+      printf("%4d %s %6.2f", i, pt_to_str_pk(he.structure).c_str(), he.energy/100.0);
       printf(" %4d %6.2f %6d %6d %10.6f %6d %10.6f\n", bi.father+1, bi.e_diff/100.0, bi.bsize, bi.fbsize, bi.fen, bi.grad, bi.feng);
       i++;
     }
@@ -532,6 +533,7 @@ int main(int argc, char **argv)
   if (seq!=NULL) free(seq);
   if (name!=NULL) free(name);
   cmdline_parser_free(&args_info);
+  freeP();
 
   // time?
   if (args_info.verbose_lvl_arg>0) {
@@ -689,10 +691,11 @@ char *read_barr(char *barr_arg, map<struct_en, barr_info, comps_entries> &output
     }
 
     // try to move it:
-    Enc.Init(seq);
-    he.energy = Enc.Energy(he);
+    SeqInfo sqi;
+    sqi.Init(seq);
+    he.energy = Opt.pknots ? energy_of_struct_pk(seq, he.structure, sqi.s0, sqi.s1, 0): energy_of_structure_pt(seq, he.structure, sqi.s0, sqi.s1, 0);
     int last_en = he.energy;
-    move_set(he);
+    move_set(he, sqi);
     /*
     //fprintf(stderr, "%f\n", he.energy);
 
@@ -703,7 +706,7 @@ char *read_barr(char *barr_arg, map<struct_en, barr_info, comps_entries> &output
 
     // print changes:
     if (last_en != he.energy) {
-      fprintf(stderr, "%6.2f -> %6.2f %s\n", last_en/100.0, he.energy/100.0, pt_to_str(he.structure).c_str());
+      fprintf(stderr, "%6.2f -> %6.2f %s\n", last_en/100.0, he.energy/100.0, pt_to_str_pk(he.structure).c_str());
     }
 
     // if we have it already:
@@ -768,7 +771,7 @@ char *read_seq(char *seq_arg, char **name_out)
 }
 
 
-int move(unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs, map<struct_en, int, comps_entries> &output, set<struct_en, comps_entries> &output_shallow)
+int move(unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs, map<struct_en, int, comps_entries> &output, set<struct_en, comps_entries> &output_shallow, SeqInfo &sqi)
 {
   // count moves
   num_moves++;
@@ -820,17 +823,26 @@ int move(unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs, map<
   while (p[len]!='\0' && p[len]!=' ') len++;
 
   if (len!=seq_len) {
-    fprintf(stderr, "WARNING: Unequal lengths:\n(structure) %s\n (sequence) %s\n", p, Enc.seq);
+    fprintf(stderr, "WARNING: Unequal lengths:\n(structure) %s\n (sequence) %s\n", p, sqi.seq);
     free(line);
     return -0;
   }
 
   // was it before?
   struct_en str;
-  str.structure = Enc.Struct(p);
-  free(line);
+  str.structure = Opt.pknots? make_pair_table_PK(p):make_pair_table(p);
+
+  // only H,K,L,M types allowed:
+  if (!str.structure) {
+    free(line);
+    return 0;
+  } else {
+    str.energy = Opt.pknots? energy_of_struct_pk(sqi.seq, str.structure, sqi.s0, sqi.s1, 0):energy_of_structure_pt(sqi.seq, str.structure, sqi.s0, sqi.s1, 0);
+    free(line);
+  }
+
   unordered_map<struct_en, gw_struct, hash_fncts, hash_eq>::iterator it_s = structs.find(str);
-  //struct_en *tmp_h = (struct_en*)lookup_hash(str);
+
   // if it was - release memory + get another
   if (it_s != structs.end()) {
     it_s->second.count++;
@@ -838,8 +850,8 @@ int move(unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs, map<
     return 0;
   } else {
     // find energy only if not in input (not working - does energy_of_move require energy_of_struct run first???)
-    str.energy = Enc.Energy(str);
-    //printf("\n%s\n%s %7.2f\n\n", Enc.seq, pt_to_str(str.structure).c_str(), str.energy/100.0);
+    //str.energy = Enc.Energy(str);
+    //printf("\n%s\n%s %7.2f\n\n", Enc.seq, pt_to_str_pk(str.structure).c_str(), str.energy/100.0);
     /*if (1 || !energy_found) str.energy = Enc.Energy(str);
     else str.energy = (int)(energy*100.0+(energy<0.0 ? -0.5 : 0.5));*/
 
@@ -849,25 +861,32 @@ int move(unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs, map<
       structures.push_back(he_str);
     }
 
-
-    // insert into hash (memory is here only on left side)
-    gw_struct &lm = structs[str];
-    lm.count = 1;
-
     //is it canonical (noLP)
-    if (Opt.noLP && find_lone_pair(str.structure)!=-1 && Opt.verbose_lvl>0) {
-      fprintf(stderr, "WARNING: structure \"%s\" has lone pairs, skipping...\n", pt_to_str(str.structure).c_str());
+    if (Opt.noLP && find_lone_pair(str.structure)!=-1) {
+      if (Opt.verbose_lvl>0) fprintf(stderr, "WARNING: structure \"%s\" has lone pairs, skipping...\n", pt_to_str_pk(str.structure).c_str());
+      free(str.structure);
       return -2;
     }
 
     // copy it anew
+    struct_en old = str;
     str.structure = allocopy(str.structure);
 
     //debugging
-    if (Opt.verbose_lvl>2) fprintf(stderr, "processing: %d %s\n", num_moves, pt_to_str(str.structure).c_str());
+    if (Opt.verbose_lvl>1) fprintf(stderr, "processing: %d %s\n", num_moves, pt_to_str_pk(str.structure).c_str());
 
     // descend
-    move_set(str);
+    move_set(str, sqi);
+    // only H type allowed!!!
+    if (Opt.pknots && str.energy == INT_MAX) {
+      free(str.structure);
+      free(old.structure);
+      return 0;
+    }
+
+    // insert into hash (memory is here only on left side)
+    gw_struct &lm = structs[old];
+    lm.count = 1;
     /*
     int i;
     while ((i = (Opt.rand? move_rand(str) : move_set(str)))!=0) {
@@ -875,7 +894,7 @@ int move(unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs, map<
     }
     Deg.Clear();*/
 
-    if (Opt.verbose_lvl>2) fprintf(stderr, "\n  %s %d\n", pt_to_str(str.structure).c_str(), str.energy);
+    if (Opt.verbose_lvl>2) fprintf(stderr, "\n  %s %d\n", pt_to_str_pk(str.structure).c_str(), str.energy);
 
     // save for output
     map<struct_en, int, comps_entries>::iterator it;

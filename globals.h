@@ -10,56 +10,24 @@ extern "C" {
   #include "RNAlocmin_cmdline.h"
 }
 #include "hash_util.h"
-
-// minimal gap for loop
-#define MINGAP 3
+#include "move_set_pk.h"
 
 // some global counters
 static int num_moves = 0;
 static int seq_len;
 
-// for energy_of_move
-class Encoded {
 
+// structure for sequence related stuff:
+
+class SeqInfo {
 public:
-  //short *pt;    // structure
+  char *seq;
   short *s0;
   short *s1;
 
-  char  *seq;
-
-  // moves
-  int   bp_left;
-  int   bp_right;
-  int   bp_left2;   // if noLP is enabled (and for shift moves)
-  int   bp_right2;
-
-  // last energy
-  int last_en;
-
-  // all possible moves
-  vector<int> moves_from;
-  vector<int> moves_to;
-
-public:
-  Encoded();
-  ~Encoded();
-
-  void Init(const char* seq);
-  short *Struct(const char *str);  // should be freed!!!
-
-  void Forget();
-  inline void Move(struct_en &he, bool first = true, bool second = true);
-  void UndoMove(struct_en &he, bool first = true, bool second = true);
-
-  // energy calculations on structures
-  int Energy(struct_en &he);
-  int EnergyOfMove(struct_en &he);
-
-  // permute possible moves
-  void Permute();
-
-  void PossMoves(struct_en &str);
+  SeqInfo();
+  ~SeqInfo();
+  void Init(char *seq);
 };
 
 // cute options singleton class
@@ -74,6 +42,8 @@ public:
   bool shift;   // use shifts?
   int verbose_lvl; // level of verbosity
   int floodMax; // cap for flooding
+
+  bool pknots; // flag for pseudoknots.
 
 public:
   Options();
@@ -98,39 +68,10 @@ public:
 
 // some good functions
 
-  // compatible base pair?
-inline bool compat(char a, char b) {
-  if (a=='A' && b=='U') return true;
-  if (a=='C' && b=='G') return true;
-  if (a=='G' && b=='U') return true;
-  if (a=='U' && b=='A') return true;
-  if (a=='G' && b=='C') return true;
-  if (a=='U' && b=='G') return true;
-  // and with T's
-  if (a=='A' && b=='T') return true;
-  if (a=='T' && b=='A') return true;
-  if (a=='G' && b=='T') return true;
-  if (a=='T' && b=='G') return true;
-  return false;
-}
-
-// try insert base pair (i,j)
-inline bool try_insert(const short *pt, const char *seq, int i, int j)
-{
-  if (i<=0 || j<=0 || i>pt[0] || j>pt[0]) return false;
-  return (j-i>MINGAP && pt[j]==0 && pt[i]==0 && compat(seq[i-1], seq[j-1]));
-}
-
-// try insert base pair (i,j)
-inline bool try_insert(const char *seq, int i, int j)
-{
-  if (i<=0 || j<=0) return false;
-  return (j-i>MINGAP && compat(seq[i-1], seq[j-1]));
-}
 
 // some singleton objects
 //extern Degen Deg;
 extern Options Opt;
-extern Encoded Enc;
+//extern Encoded Enc;
 
 #endif

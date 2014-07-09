@@ -1,6 +1,6 @@
 #ViennaRNA package location
-ViennaRNA=~/software/include/ViennaRNA
-ViennaLIB=~/software/lib/libRNA.a
+ViennaRNA=~/software/ViennaRNA-2.1.1/H
+ViennaLIB=~/software/ViennaRNA-2.1.1/lib/libRNA.a
 
 CPP = g++
 CC = gcc
@@ -15,7 +15,9 @@ OBJ = RNAlocmin_cmdline.o\
 			main.o\
 			RNAlocmin.o\
 			treeplot.o\
-			globals.o
+			globals.o\
+			move_set_pk.o\
+			pknots.o
 
 DIRS = -I $(ViennaRNA)
 

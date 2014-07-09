@@ -1,97 +1,61 @@
 #ifndef __MOVE_SET_PK_H
 #define __MOVE_SET_PK_H
 
-#include <set>
-#include <map>
-#include <string>
+#include "pknots.h"
 
-#include "move_set.h"
+extern "C" {
+  #include "move_set.h"
+}
 
-using namespace std;
+//enum MOVE_TYPE {GRADIENT, FIRST, ADAPTIVE};
 
-enum  PK_TYPE           {NPK, PK_H, PK_K, PK_L, PK_M}; // types of pseudoknot - NPK is Kfree structure
-const int beta1_pen[] =   {0,  960, 1160, 1360, 1660};
-const int beta1mp_pen[] = {0, 1500, 1700, 1900, 2100};
-const int beta2_pen[] =   {0,   10,   10,   10,   10};
-const int beta3_pen[] =   {0,   10,   10,   10,   10};
+/* walking methods (verbose_lvl 0-2, shifts = use shift moves? noLP = no lone pairs? (not compatible with shifts))
+    input:    seq - sequence
+              ptable - structure encoded with make_pair_table() from pair_mat.h
+              s, s1 - sequence encoded with encode_sequence from pair_mat.h
+    methods:  deepest - lowest energy structure is used
+              first - first found lower energy structure is used
+              rand - random lower energy structure is used
+    returns local minima structure in ptable and its energy in 10kcal/mol as output */
 
-class Bpair {
-public:
-  int start;  // left parenthesis
-  int end;    // right parenthesis
-  int next_left; // enclosed in multiloop starting in? (next left nested sibling)
-  int next_right; // next right nested sibling
-  //int nestings; // number of nestings that I encapsule (0 means im topmost nesting - left_most = this) ??? we don't need this do we?
-  set<int> left_cross; // crossings from left side
-  set<int> right_cross; // crossings from right side
+int move_gradient_pk(Structure *str,
+                  int verbosity_level);
+int move_first_pk(   Structure *str,
+                  int verbosity_level);
+int move_adaptive_pk(Structure *str,
+                  int verbosity_level);
 
-  const bool operator<(const Bpair &second) const {
-    if (start == second.start) return end < second.end;
-    return start < second.start;
-  }
+/* standardized method that encapsulates above "_pt" methods
+  input:  seq - sequence
+          struc - structure in dot-bracket notation
+          type - type of move selection according to MOVE_TYPE enum
+  return: energy of LM
+          structure of LM in struc in bracket-dot notation
+*/
+int move_standard_pk(char *seq,
+                  char *struc,
+                  enum MOVE_TYPE type,
+                  int verbosity_level);
 
-public:
-  Bpair(); // forbidden to use!!
-  Bpair(int left, int right);
-};
+int move_standard_pk_pt(Structure *str,
+                  enum MOVE_TYPE type,
+                  int verbosity_level);
 
-struct pk_info {
-  int num_bp;    // bp total
-  int num_nn_bp; // bp non-nested
-  int start;
-  int end;
+/* browse_neighbours and perform "funct" function on each of them (used mainly for user specified flooding)
+    input:    seq - sequence
+              ptable - structure encoded with make_pair_table() from pair_mat.h
+              s, s1 - sequence encoded with encode_sequence from pair_mat.h
+              funct - function (structure from neighbourhood, structure from input) toperform on every structure in neigbourhood (if the function returns non-zero, the iteration through neighbourhood stops.)
+    returns energy of the structure funct sets as second argument*/
+int browse_neighs_pk_pt(Structure  *tree,
+                   int verbosity_level,
+                   int (*funct) (Structure*, Structure*));
 
-  pk_info() {
-    num_bp = 0;
-    num_nn_bp = 0;
-    start = 0;
-    end = 0;
-  }
-};
+int browse_neighs_pk( char *seq,
+                   char *struc,
+                   int verbosity_level,
+                   int (*funct) (Structure*, Structure*));
 
-class Pseudoknot {
-
-  // data
-  PK_TYPE type;
-  int energy_penalty;   // penalty for making a pseudoknot (constant for type (beta1))
-  int energy_penalty2;  // penalty for arcs and unpaired stuff in PK (beta2 + beta3)
-
-  map<int, Bpair> bpairs;
-
-  int num_cross;    // total number of crossings in the PK
-  //int num_ind_cross; // num of the independent crossings - non-nested ones
-
-  // helper
-  map<int, int> points;  // points to starts and ends of bps.
-
-  // pk info:
-  pk_info pki;     // info about the betas.
-
-public:
-  Pseudoknot();
-  Pseudoknot(short *str, int left); // construct from structure
-  int AddBpair(int left, int right);
-  int RemoveBpair(int left);
-
-  // helpers
-  int Start();
-  int End();
-  int Clear(); // returns the energy penalty freed
-  map<int, int>::iterator FirstPoint(int point); // return first point from points equal or higher than point
-
-  // clears/add back all crossing pairs with base pair of choice from structure
-  int ClearNeighsOfBP(short *str, int left);
-  int AddNeighsOfBP(short *str, int left);
-
-  pk_info FindPKrange(int point);
-  int GetPenalty(pk_info pki);
-};
-
-int deletions_pk(Pseudoknot &PKstruct, struct_en *str, struct_en *minim);
-
-int move_PK(Pseudoknot &PKstruct, short *str, short *s0, short *s1, int left, int right);
-string pt_to_str_pk(short *str);
-int try_pk();
 #endif
 
 

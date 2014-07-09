@@ -58,7 +58,7 @@ int flood_func(struct_en *input, struct_en *output)
   }
 }
 
-struct_en* flood(const struct_en &he, int &saddle_en, int maxh)
+struct_en* flood(const struct_en &he, SeqInfo &sqi, int &saddle_en, int maxh)
 {
   int count = 0;
   debugg = Opt.verbose_lvl>2;
@@ -106,7 +106,7 @@ struct_en* flood(const struct_en &he, int &saddle_en, int maxh)
     if (Opt.verbose_lvl>2) fprintf(stderr, "  neighbours of: %s %.2f\n", pt_to_str(he_top->structure).c_str(), he_top->energy/100.0);
 
     int verbose = Opt.verbose_lvl<2?0:Opt.verbose_lvl-2;
-    he_top->energy = browse_neighs_pt(Enc.seq, he_top->structure, Enc.s0, Enc.s1, verbose, Opt.shift, Opt.noLP, flood_func);
+    he_top->energy = browse_neighs_pt(sqi.seq, he_top->structure, sqi.s0, sqi.s1, verbose, Opt.shift, Opt.noLP, flood_func);
 
     if (found_exit && Opt.verbose_lvl>2) fprintf(stderr, "sad= %6.2f    : %s %.2f\n", saddle_en/100.0, pt_to_str(he_top->structure).c_str(), he_top->energy/100.0);
 

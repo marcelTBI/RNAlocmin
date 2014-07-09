@@ -14,6 +14,7 @@ extern "C" {
 }
 
 #include "RNAlocmin.h"
+#include "move_set_pk.h"
 
 // reads a line no matter how long
 char* my_getline(FILE *fp)
@@ -113,14 +114,21 @@ string pt_to_str(short *pt)
 }
 
 // encapsulation
-int move_set(struct_en &input)
+int move_set(struct_en &input, SeqInfo &sqi)
 {
   // call the coresponding method
   int verbose = (Opt.verbose_lvl-2<0?0:Opt.verbose_lvl-2);
-  if (Opt.rand) input.energy = move_adaptive(Enc.seq, input.structure, Enc.s0, Enc.s1, verbose);
-  else {
-    if (Opt.first) input.energy = move_first(Enc.seq, input.structure, Enc.s0, Enc.s1, verbose, Opt.shift, Opt.noLP);
-    else input.energy = move_gradient(Enc.seq, input.structure, Enc.s0, Enc.s1, verbose, Opt.shift, Opt.noLP);
+  if (Opt.pknots && Contains_PK(input.structure)) {
+    MOVE_TYPE mt = Opt.rand?ADAPTIVE:Opt.first?FIRST:GRADIENT;
+    Structure str(sqi.seq, input.structure);
+    input.energy = move_standard_pk_pt(&str, mt, Opt.verbose_lvl);
+    copy_arr(input.structure, str.str);
+  } else {
+    if (Opt.rand) input.energy = move_adaptive(sqi.seq, input.structure, sqi.s0, sqi.s1, verbose);
+    else {
+      if (Opt.first) input.energy = move_first(sqi.seq, input.structure, sqi.s0, sqi.s1, verbose, Opt.shift, Opt.noLP);
+      else input.energy = move_gradient(sqi.seq, input.structure, sqi.s0, sqi.s1, verbose, Opt.shift, Opt.noLP);
+    }
   }
   return input.energy;
 }
