@@ -10,6 +10,8 @@ extern "C" {
   #include "move_set.h"
 }
 
+#include "pknots.h"
+
 using namespace std;
 
 // help struct for hash
@@ -58,9 +60,60 @@ struct hash_eq {
     if (i>lhs->structure[0]) return true;
     else return false;
   }
+  bool operator()(const Structure &lhs, const Structure &rhs) const{
+    return lhs == rhs;
+  }
+
+  bool operator()(const Structure *lhs, const Structure *rhs) const{
+    return *lhs == *rhs;
+  }
 };
 
 struct hash_fncts{
+  size_t operator()(const Structure &x) const {
+
+  register short *k;        /* the key */
+  register unsigned  length;   /* the length of the key */
+  register unsigned  initval=0;  /* the previous hash, or an arbitrary value */
+  register unsigned a,b,c,len;
+
+  /* Set up the internal state */
+  k = x.str;
+  len = length = (unsigned) k[0];
+  a = b = 0x9e3779b9;  /* the golden ratio; an arbitrary value */
+  c = initval;         /* the previous hash value */
+
+  /*---------------------------------------- handle most of the key */
+  while (len >= 12) {
+    a += (k[0] +((unsigned)k[1]<<8) +((unsigned)k[2]<<16) +((unsigned)k[3]<<24));
+    b += (k[4] +((unsigned)k[5]<<8) +((unsigned)k[6]<<16) +((unsigned)k[7]<<24));
+    c += (k[8] +((unsigned)k[9]<<8) +((unsigned)k[10]<<16)+((unsigned)k[11]<<24));
+    mix(a,b,c);
+    k += 12; len -= 12;
+  }
+
+  /*------------------------------------- handle the last 11 bytes */
+  c += length;
+  switch(len) {             /* all the case statements fall through */
+    case 11: c+=((unsigned)k[10]<<24);
+    case 10: c+=((unsigned)k[9]<<16);
+    case 9 : c+=((unsigned)k[8]<<8);
+      /* the first byte of c is reserved for the length */
+    case 8 : b+=((unsigned)k[7]<<24);
+    case 7 : b+=((unsigned)k[6]<<16);
+    case 6 : b+=((unsigned)k[5]<<8);
+    case 5 : b+=k[4];
+    case 4 : a+=((unsigned)k[3]<<24);
+    case 3 : a+=((unsigned)k[2]<<16);
+    case 2 : a+=((unsigned)k[1]<<8);
+    case 1 : a+=k[0];
+     /* case 0: nothing left to add */
+  }
+  mix(a,b,c);
+   /*-------------------------------------------- report the result */
+  return (c & HASHSIZE);
+  }
+
   size_t operator()(const struct_en &x) const {
 
   register short *k;        /* the key */
@@ -104,9 +157,49 @@ struct hash_fncts{
    /*-------------------------------------------- report the result */
   return (c & HASHSIZE);
   }
-};
+  size_t operator()(const Structure *x) const {
+  register short *k;        /* the key */
+  register unsigned  length;   /* the length of the key */
+  register unsigned  initval=0;  /* the previous hash, or an arbitrary value */
+  register unsigned a,b,c,len;
 
-struct hash_fncts2{
+  /* Set up the internal state */
+  k = x->str;
+  len = length = (unsigned) k[0];
+  a = b = 0x9e3779b9;  /* the golden ratio; an arbitrary value */
+  c = initval;         /* the previous hash value */
+
+  /*---------------------------------------- handle most of the key */
+  while (len >= 12) {
+    a += (k[0] +((unsigned)k[1]<<8) +((unsigned)k[2]<<16) +((unsigned)k[3]<<24));
+    b += (k[4] +((unsigned)k[5]<<8) +((unsigned)k[6]<<16) +((unsigned)k[7]<<24));
+    c += (k[8] +((unsigned)k[9]<<8) +((unsigned)k[10]<<16)+((unsigned)k[11]<<24));
+    mix(a,b,c);
+    k += 12; len -= 12;
+  }
+
+  /*------------------------------------- handle the last 11 bytes */
+  c += length;
+  switch(len) {             /* all the case statements fall through */
+    case 11: c+=((unsigned)k[10]<<24);
+    case 10: c+=((unsigned)k[9]<<16);
+    case 9 : c+=((unsigned)k[8]<<8);
+      /* the first byte of c is reserved for the length */
+    case 8 : b+=((unsigned)k[7]<<24);
+    case 7 : b+=((unsigned)k[6]<<16);
+    case 6 : b+=((unsigned)k[5]<<8);
+    case 5 : b+=k[4];
+    case 4 : a+=((unsigned)k[3]<<24);
+    case 3 : a+=((unsigned)k[2]<<16);
+    case 2 : a+=((unsigned)k[1]<<8);
+    case 1 : a+=k[0];
+     /* case 0: nothing left to add */
+  }
+  mix(a,b,c);
+   /*-------------------------------------------- report the result */
+  return (c & HASHSIZE);
+  }
+
   size_t operator()(const struct_en *x) const {
 
   register short *k;        /* the key */
@@ -190,6 +283,9 @@ struct comps_entries_rev {
     if (lhs->energy!=rhs->energy) return lhs->energy>rhs->energy;
     return compf_short_rev(lhs->structure, rhs->structure);
   }
+  bool operator() (const Structure *lhs, const Structure *rhs) const {
+    return *lhs<*rhs;
+  }
 };
 
 // print stats about hash
@@ -200,7 +296,9 @@ void add_stats(unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs
 
 // free hash
 void free_hash(unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs);
-void free_hash(unordered_set<struct_en*, hash_fncts2, hash_eq> &structs);
+//void free_hash(unordered_map<Structure, gw_struct, hash_fncts, hash_eq> &structs);
+void free_hash(unordered_set<struct_en*, hash_fncts, hash_eq> &structs);
+void free_hash(unordered_set<Structure*, hash_fncts, hash_eq> &structs);
 
 // entry handling
 struct_en *copy_entry(const struct_en *he);

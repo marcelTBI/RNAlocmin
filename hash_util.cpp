@@ -92,12 +92,23 @@ void free_hash(unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs
 }
 
 // free hash
-void free_hash(unordered_set<struct_en*, hash_fncts2, hash_eq> &structs)
+void free_hash(unordered_set<struct_en*, hash_fncts, hash_eq> &structs)
 {
-  unordered_set<struct_en*, hash_fncts2, hash_eq>::iterator it;
+  unordered_set<struct_en*, hash_fncts, hash_eq>::iterator it;
   for (it=structs.begin(); it!=structs.end(); it++) {
     free((*it)->structure);
     free(*it);
+  }
+  structs.clear();
+}
+
+// free hash
+void free_hash(unordered_set<Structure*, hash_fncts, hash_eq> &structs)
+{
+  unordered_set<Structure*, hash_fncts, hash_eq>::iterator it;
+  for (it=structs.begin(); it!=structs.end(); it++) {
+    //free((*it)->str);
+    delete *it;
   }
   structs.clear();
 }

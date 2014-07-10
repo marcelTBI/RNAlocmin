@@ -22,6 +22,8 @@ extern "C" {
   #include "move_set.h"
 }
 
+#include "findpath_pk.h"
+
 #include "hash_util.h"
 #include "globals.h"
 #include "RNAlocmin.h"
@@ -241,7 +243,7 @@ int main(int argc, char **argv)
         // first check if the output is not shallow
         if (Opt.minh>0) {
           int saddle;
-          struct_en *escape = flood(it->first, sqi, saddle, Opt.minh);
+          struct_en *escape = flood(it->first, sqi, saddle, Opt.minh, args_info.pseudoknots_flag);
 
           if (args_info.verbose_lvl_arg>0 && ii%100 == 0) {
             fprintf(stderr, "non-shallow remained: %d / %d; time: %.2f secs.\n", i, ii, (clock()-clck1)/(double)CLOCKS_PER_SEC);
@@ -348,7 +350,7 @@ int main(int argc, char **argv)
           if (args_info.verbose_lvl_arg>2) fprintf(stderr,   "flooding  (%3d): %s %.2f\n", i, output_str[i].c_str(), output_he[i].energy/100.0);
 
           int saddle;
-          struct_en *he = flood(output_he[i], sqi, saddle);
+          struct_en *he = flood(output_he[i], sqi, saddle, Opt.minh, args_info.pseudoknots_flag);
 
           // print info
           if (args_info.verbose_lvl_arg>1) {
@@ -373,7 +375,6 @@ int main(int argc, char **argv)
 
             if (args_info.verbose_lvl_arg>1) fprintf(stderr, "minimum: %s %.2f\n", pt_to_str_pk(he->structure).c_str(), he->energy/100.0);
             // we dont need it again
-            free_se(he);
 
             hash_eq heq;
             if (it!=output_he.end() && heq(&*it, he)) {
@@ -387,6 +388,7 @@ int main(int argc, char **argv)
               //fprintf(stderr, "join: %d %d\n", min(i, pos), max(i, pos));
               union_set(min(i, pos), max(i, pos));
             }
+            free_se(he);
           }
         }
       }
@@ -415,7 +417,8 @@ int main(int argc, char **argv)
         set<int>::iterator it2=it;
         it2++;
         for (; it2!=to_findpath.end(); it2++) {
-          energy_barr[(*it2)*num+(*it)] = energy_barr[(*it)*num+(*it2)] = find_saddle(seq, output_str[*it].c_str(), output_str[*it2].c_str(), args_info.depth_arg)/100.0;
+          if (args_info.pseudoknots_flag) energy_barr[(*it2)*num+(*it)] = energy_barr[(*it)*num+(*it2)] = find_saddle_pk(seq, output_str[*it].c_str(), output_str[*it2].c_str(), args_info.depth_arg)/100.0;
+          else energy_barr[(*it2)*num+(*it)] = energy_barr[(*it)*num+(*it2)] = find_saddle(seq, output_str[*it].c_str(), output_str[*it2].c_str(), args_info.depth_arg)/100.0;
           findpath_barr[(*it2)*num+(*it)] = findpath_barr[(*it)*num+(*it2)] = true;
           if (args_info.verbose_lvl_arg>0 && findpath %10000==0){
             fprintf(stderr, "Findpath:%7d/%7d\n", findpath, (int)(to_findpath.size()*(to_findpath.size()-1)/2));
@@ -473,7 +476,7 @@ int main(int argc, char **argv)
         clck1 = clock();
       }
 
-      // printf output with fathers!
+      // printf output with fathers! maybe
       printf("     %s\n", seq);
       for (unsigned int i=0; i<output_str.size(); i++) {
         if (args_info.eRange_given) {
@@ -482,7 +485,8 @@ int main(int argc, char **argv)
           }
         }
         printf("%4d %s %6.2f", i+1, output_str[i].c_str(), output_en[i]/100.0);
-        printf(" %4d %6.2f %6d\n", nodes[i].father+1, nodes[i].saddle_height-nodes[i].height, output_num[i]);
+        if (args_info.bartree_flag) printf(" %4d %6.2f\n", nodes[i].father+1, nodes[i].saddle_height-nodes[i].height);
+        printf(" %6d\n", output_num[i]);
       }
 
     } else {
