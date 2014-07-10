@@ -120,8 +120,8 @@ int move_set(struct_en &input, SeqInfo &sqi)
   int verbose = (Opt.verbose_lvl-2<0?0:Opt.verbose_lvl-2);
   if (Opt.pknots && Contains_PK(input.structure)) {
     MOVE_TYPE mt = Opt.rand?ADAPTIVE:Opt.first?FIRST:GRADIENT;
-    Structure str(sqi.seq, input.structure);
-    input.energy = move_standard_pk_pt(&str, mt, Opt.verbose_lvl);
+    Structure str(sqi.seq, input.structure, sqi.s0, sqi.s1);
+    input.energy = move_standard_pk_pt(sqi.seq, &str, sqi.s0, sqi.s1, mt, Opt.verbose_lvl);
     copy_arr(input.structure, str.str);
   } else {
     if (Opt.rand) input.energy = move_adaptive(sqi.seq, input.structure, sqi.s0, sqi.s1, verbose);

@@ -12,6 +12,8 @@ extern "C" {
   #include "pair_mat.h"
   #include "fold.h"
   #include "loop_energies.h"
+
+  #include "move_set.h"
 }
 
 #include "pknots.h"
@@ -45,7 +47,7 @@ inline int M_Loop(int p, int q, short *s0, paramT *P)
 }
 
 using namespace std;
-
+/*
 void copy_arr(short *dest, const short *src)
 {
   if (!src || !dest) {
@@ -67,7 +69,7 @@ char *allocopy(const char *src)
   char *res = (char*) malloc(sizeof(char)*(strlen(src)+1));
   strcpy(res, src);
   return res;
-}
+}*/
 
 short *make_pair_table_PK(const char *str)
 {
@@ -497,7 +499,7 @@ void Helpers::Create(int length)
   last_open = 0;
 }
 
-int energy_of_struct_pk(char *seq, char *structure, int verbose)
+int energy_of_struct_pk(const char *seq, char *structure, int verbose)
 {
   make_pair_matrix();
   short *str = make_pair_table_PK(structure);
@@ -506,8 +508,9 @@ int energy_of_struct_pk(char *seq, char *structure, int verbose)
   return res;
 }
 
-int energy_of_struct_pk(char *seq, short *structure, int verbose)
+int energy_of_struct_pk(const char *seq, short *structure, int verbose)
 {
+  make_pair_matrix();
   short *s0 = encode_sequence(seq, 0);
   short *s1 = encode_sequence(seq, 1);
 
@@ -519,7 +522,7 @@ int energy_of_struct_pk(char *seq, short *structure, int verbose)
   return res;
 }
 
-int energy_of_struct_pk(char *seq, short *structure, short *s0, short *s1, int verbose)
+int energy_of_struct_pk(const char *seq, short *structure, short *s0, short *s1, int verbose)
 {
   clock_t time = clock();
 
@@ -763,10 +766,17 @@ Pseudoknot &Pseudoknot::operator=(const Pseudoknot &pknot)
   return *this;
 }
 
-Structure::Structure(char *seq, short *structure)
+Structure::Structure(int length)
 {
-  this->seq = allocopy(seq);
+  this->str = (short*) malloc(sizeof(short)*(length+1));
+  for (int i=1; i<=length; i++) this->str[i] = 0;
+  this->str[0] = length;
 
+  this->energy = 0;
+}
+
+Structure::Structure(short *structure, int energy)
+{
   int length = structure[0];
   this->str = (short*) malloc(sizeof(short)*(length+1));
   for (int i=1; i<=length; i++) this->str[i] = 0;
@@ -777,13 +787,11 @@ Structure::Structure(char *seq, short *structure)
     if (structure[i]>i) ViableInsert(i, structure[i], true);
   }
 
-  energy = energy_of_struct_pk(seq, str, 0);
+  this->energy = energy;
 }
 
-Structure::Structure(char *seq, char *structure)
+Structure::Structure(char *structure, int energy)
 {
-  this->seq = allocopy(seq);
-
   int length = strlen(structure);
   this->str = (short*) malloc(sizeof(short)*(length+1));
   for (int i=1; i<=length; i++) this->str[i] = 0;
@@ -796,14 +804,45 @@ Structure::Structure(char *seq, char *structure)
   }
   free(str_tmp);
 
-  energy = energy_of_struct_pk(seq, str, 0);
+  this->energy = energy;
 }
 
-Structure::Structure(Structure &second)
+Structure::Structure(const char *seq, short *structure, short *s0, short *s1)
+{
+  int length = structure[0];
+  this->str = (short*) malloc(sizeof(short)*(length+1));
+  for (int i=1; i<=length; i++) this->str[i] = 0;
+  this->str[0] = length;
+
+  // assign all bpairs:
+  for (int i=1; i<=structure[0]; i++) {
+    if (structure[i]>i) ViableInsert(i, structure[i], true);
+  }
+
+  energy = energy_of_struct_pk(seq, str, s0, s1, 0);
+}
+
+Structure::Structure(const char *seq, char *structure, short *s0, short *s1)
+{
+  int length = strlen(structure);
+  this->str = (short*) malloc(sizeof(short)*(length+1));
+  for (int i=1; i<=length; i++) this->str[i] = 0;
+  this->str[0] = length;
+
+  // assign all bpairs:
+  short *str_tmp = make_pair_table_PK(structure);
+  for (int i=1; i<=str_tmp[0]; i++) {
+    if (str_tmp[i]>i) ViableInsert(i, str_tmp[i], true);
+  }
+  free(str_tmp);
+
+  energy = energy_of_struct_pk(seq, str, s0, s1, 0);
+}
+
+Structure::Structure(const Structure &second)
 {
   energy = second.energy;
   str = allocopy(second.str);
-  seq = allocopy(second.seq);
 
   pknots = second.pknots;
 
@@ -813,7 +852,6 @@ Structure::Structure(Structure &second)
 Structure::~Structure()
 {
   free(str);
-  free(seq);
 }
 
 bool const Structure::operator<(const Structure &second) const
@@ -843,11 +881,10 @@ bool const Structure::operator==(const Structure &second) const
   return true;
 }
 
-Structure &Structure::operator=(Structure &second)
+Structure &Structure::operator=(const Structure &second)
 {
   energy = second.energy;
   copy_arr(str, second.str);
-  strcpy(seq, second.seq);
 
   pknots = second.pknots;
 
@@ -1067,13 +1104,13 @@ bool Structure::Delete(int left)
   return true;
 }
 
-int Structure::MakeMove(int left, int right)
+int Structure::MakeMove(const char *seq, short *s0, short *s1, int left, int right)
 {
   int old_energy = energy;
   bool change = false;
   if (left<0) change = Delete(left);
   else change = (Insert(left, right) != NO_INS);
-  if (change) energy = energy_of_struct_pk(seq, str, 0);
+  if (change) energy = energy_of_struct_pk(seq, str, s0, s1, 0);
   return energy - old_energy;
 }
 

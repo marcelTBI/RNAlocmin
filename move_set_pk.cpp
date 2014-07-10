@@ -7,11 +7,15 @@
 
 #include "move_set_pk.h"
 
+extern "C" {
+  #include "pair_mat.h"
+}
+
 /* maximum degeneracy value - if degeneracy is greater than this, program segfaults*/
 #define MAX_DEGEN 100
 #define MINGAP 3
 
-#define space(a) malloc(a)
+//#define space(a) malloc(a)
 
 #define bool int
 #define true 1
@@ -41,22 +45,6 @@ int equals(const Structure *first, const Structure *second)
   return (*first)==(*second);
 }
 
-void copy_arr(short *dest, short *src)
-{
-  if (!src || !dest) {
-    fprintf(stderr, "Empty pointer in copying\n");
-    return;
-  }
-  memcpy(dest, src, sizeof(short)*(src[0]+1));
-}
-
-short *allocopy(short *src)
-{
-  short *res = (short*) space(sizeof(short)*(src[0]+1));
-  copy_arr(res, src);
-  return res;
-}
-
 /* ############################## DECLARATION #####################################*/
 /* private functions & declarations*/
 
@@ -72,6 +60,8 @@ int lone_base(short *pt, int i);
 typedef struct _Encoded {
   // sequence
   const char  *seq;
+  short *s0;
+  short *s1;
 
   /* moves*/
   int   bp_left;
@@ -151,14 +141,14 @@ int update_deepest(Encoded *Enc, Structure *str, Structure *min)
 {
   /* apply move + get its energy*/
   int tmp_en;
-  tmp_en = str->energy + str->MakeMove(Enc->bp_left, Enc->bp_right);
+  tmp_en = str->energy + str->MakeMove(Enc->seq, Enc->s0, Enc->s1, Enc->bp_left, Enc->bp_right);
 
   /* use f_point if we have it */
   if (Enc->funct) {
     int end = Enc->funct(str, min);
 
     // undo moves
-    str->MakeMove(-Enc->bp_left, -Enc->bp_right);
+    str->MakeMove(Enc->seq, Enc->s0, Enc->s1, -Enc->bp_left, -Enc->bp_right);
     Enc->bp_left=0;
     Enc->bp_right=0;
 
@@ -176,7 +166,7 @@ int update_deepest(Encoded *Enc, Structure *str, Structure *min)
     free_degen(Enc);
 
     /* undo moves*/
-    str->MakeMove(-Enc->bp_left, -Enc->bp_right);
+    str->MakeMove(Enc->seq, Enc->s0, Enc->s1, -Enc->bp_left, -Enc->bp_right);
     Enc->bp_left=0;
     Enc->bp_right=0;
     return 1;
@@ -207,7 +197,7 @@ int update_deepest(Encoded *Enc, Structure *str, Structure *min)
   }
 
   /* undo moves*/
-  str->MakeMove(-Enc->bp_left, -Enc->bp_right);
+  str->MakeMove(Enc->seq, Enc->s0, Enc->s1, -Enc->bp_left, -Enc->bp_right);
   Enc->bp_left=0;
   Enc->bp_right=0;
   return 0;
@@ -483,15 +473,15 @@ int move_rset(Encoded *Enc, Structure *str_in)
 }
 
 /*check if base is lone*/
-int lone_base(short *pt, int i)
+/*int lone_base(short *pt, int i)
 {
   if (i<=0 || i>pt[0]) return 0;
-  /* is not a base pair*/
+  // is not a base pair
   if (pt[i]==0) return 0;
 
-  /* base is lone:*/
+  // base is lone:
   if (i-1>0) {
-    /* is base pair and is the same bracket*/
+    // is base pair and is the same bracket
     if (pt[i-1]!=0 && ((pt[i-1]<pt[pt[i-1]]) == (pt[i]<pt[pt[i]]))) return 0;
   }
 
@@ -500,29 +490,39 @@ int lone_base(short *pt, int i)
   }
 
   return 1;
-}
+}*/
 
-int move_standard_pk_pt(Structure *str,
+int move_standard_pk_pt(const char *seq,
+                  Structure *str,
+                  short *s0,
+                  short *s1,
                   enum MOVE_TYPE type,
                   int verbosity_level)
 {
   switch (type){
-  case GRADIENT: move_gradient_pk(str, verbosity_level); break;
-  case FIRST: move_first_pk(str, verbosity_level); break;
-  case ADAPTIVE: move_adaptive_pk(str, verbosity_level); break;
+  case GRADIENT: move_gradient_pk(seq, str, s0, s1, verbosity_level); break;
+  case FIRST: move_first_pk(seq, str, s0, s1, verbosity_level); break;
+  case ADAPTIVE: move_adaptive_pk(seq, str, s0, s1, verbosity_level); break;
   }
 
   return str->energy;
 }
 
-int move_standard_pk(char *seq,
+int move_standard_pk(const char *seq,
                   char *struc,
                   enum MOVE_TYPE type,
                   int verbosity_level)
 {
-  Structure *str = new Structure(seq, struc);
+  make_pair_matrix();
+  short *s0 = encode_sequence(seq, 0);
+  short *s1 = encode_sequence(seq, 1);
 
-  int energy = move_standard_pk_pt(str, type, verbosity_level);
+  Structure *str = new Structure(seq, struc, s0, s1);
+
+  int energy = move_standard_pk_pt(seq, str, s0, s1, type, verbosity_level);
+
+  free(s0);
+  free(s1);
 
   pt_to_chars_pk(str->str, struc);
   delete str;
@@ -530,13 +530,18 @@ int move_standard_pk(char *seq,
   return energy;
 }
 
-int move_gradient_pk(Structure *str,
+int move_gradient_pk(const char *seq,
+                  Structure *str,
+                  short *s0,
+                  short *s1,
                   int verbosity_level)
 {
   cnt_move = 0;
 
   Encoded enc;
-  enc.seq = str->seq;
+  enc.seq = seq;
+  enc.s0 = s0;
+  enc.s1 = s1;
 
   /* moves*/
   enc.bp_left=0;
@@ -573,13 +578,18 @@ int move_gradient_pk(Structure *str,
   return str->energy;
 }
 
-int move_first_pk(Structure *str,
+int move_first_pk(const char *seq,
+                  Structure *str,
+                  short *s0,
+                  short *s1,
                   int verbosity_level)
 {
   cnt_move = 0;
 
   Encoded enc;
-  enc.seq = str->seq;
+  enc.seq = seq;
+  enc.s0 = s0;
+  enc.s1 = s1;
 
   /* moves*/
   enc.bp_left=0;
@@ -611,7 +621,10 @@ int move_first_pk(Structure *str,
   return str->energy;
 }
 
-int move_adaptive_pk(Structure *str,
+int move_adaptive_pk(const char *seq,
+                  Structure *str,
+                  short *s0,
+                  short *s1,
                   int verbosity_level)
 {
   srand(time(NULL));
@@ -619,7 +632,9 @@ int move_adaptive_pk(Structure *str,
   cnt_move = 0;
 
   Encoded enc;
-  enc.seq = str->seq;
+  enc.seq = seq;
+  enc.s0 = s0;
+  enc.s1 = s1;
 
   /* moves*/
   enc.bp_left=0;
@@ -659,29 +674,41 @@ int move_adaptive_pk(Structure *str,
   return str->energy;
 }
 
-int browse_neighs_pk( char *seq,
+int browse_neighs_pk( const char *seq,
                    char *struc,
                    int verbosity_level,
                    int (*funct) (Structure*, Structure*))
 
 {
-  Structure *str = new Structure(seq, struc);
+  make_pair_matrix();
+  short *s0 = encode_sequence(seq, 0);
+  short *s1 = encode_sequence(seq, 1);
 
-  int res = browse_neighs_pk_pt(str, verbosity_level, funct);
+  Structure *str = new Structure(seq, struc, s0, s1);
+
+  int res = browse_neighs_pk_pt(seq, str, s0, s1, verbosity_level, funct);
+
+  free(s0);
+  free(s1);
 
   delete str;
 
   return res;
 }
 
-int browse_neighs_pk_pt( Structure *str,
+int browse_neighs_pk_pt(const char *seq,
+                  Structure *str,
+                  short *s0,
+                  short *s1,
                   int verbosity_level,
                   int (*funct) (Structure*, Structure*))
 {
   cnt_move = 0;
 
   Encoded enc;
-  enc.seq = str->seq;
+  enc.seq = seq;
+  enc.s0 = s0;
+  enc.s1 = s1;
 
   /* moves*/
   enc.bp_left=0;

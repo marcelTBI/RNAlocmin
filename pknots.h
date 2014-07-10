@@ -10,10 +10,6 @@
 #include <map>
 #include <string>
 
-extern "C" {
-  #include "data_structures.h"
-}
-
 enum BPAIR_TYPE {N_S, N_M, P_H, P_K, P_L, P_M, ROOT};
 const char bpair_type_name[][5] = {"S", "M", "P_H", "P_K", "P_L", "P_M", "ROOT"};
 const char bpair_type_sname[] = "smHKLM_";
@@ -26,6 +22,9 @@ short *make_pair_table_PK(const char *str);
 std::string pt_to_str_pk(const short *str);
 char* pt_to_chars_pk(const short *str);
 void pt_to_chars_pk(const short *str, char *dest);
+//short *allocopy(const short *src);
+//char *allocopy(const char *src);
+//void copy_arr(short *dest, const short *src);
 
 int Contains_PK(short *str);
 
@@ -77,16 +76,19 @@ class Structure {
 public:
   // old-school structure
   short *str;
-  char *seq;
+  //char *seq;
 
   // energy:
   int energy;
 
 public:
   // constructor
-  Structure(char *seq, short *structure);
-  Structure(char *seq, char *structure);
-  Structure(Structure &second);
+  Structure(const char *seq, short *structure, short *s0, short *s1);
+  Structure(const char *seq, char *structure, short *s0, short *s1);
+  Structure(short *structure, int energy);
+  Structure(char *structure, int energy);
+  Structure(const Structure &second);
+  Structure(int length);
   ~Structure();
 
   inline Pseudoknot *Pknot_index(int index) {
@@ -100,7 +102,7 @@ public:
 
   bool const operator<(const Structure &second) const;
   bool const operator==(const Structure &second) const;
-  Structure &operator=(Structure &second);
+  Structure &operator=(const Structure &second);
 private:
   // is the bpair viable?
   INS_FLAG ViableInsert(int left, int right, bool insert = false);
@@ -108,7 +110,7 @@ private:
   bool Delete(int left);
 public:
   // do a move
-  int MakeMove(int left, int right);
+  int MakeMove(const char *seq, short *s0, short *s1, int left, int right);
 
   INS_FLAG CanInsert(int left, int right);
 };
@@ -125,9 +127,9 @@ public:
   Helpers(int length);
 };
 
-int energy_of_struct_pk(char *seq, char *structure, int verbose = 0);
-int energy_of_struct_pk(char *seq, short *structure, int verbose = 0);
-int energy_of_struct_pk(char *seq, short *structure, short *s0, short *s1, int verbose = 0);
+int energy_of_struct_pk(const char *seq, char *structure, int verbose = 0);
+int energy_of_struct_pk(const char *seq, short *structure, int verbose = 0);
+int energy_of_struct_pk(const char *seq, short *structure, short *s0, short *s1, int verbose = 0);
 void freeP(); // cleanup - run after last call of energy_of_struct - not necessary
 
 
