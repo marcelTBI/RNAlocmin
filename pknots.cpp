@@ -256,6 +256,8 @@ int loop_energy_pk(int begin, short *str, short *s0, short *s1, paramT *P, bool 
   int alone_upto = begin;
   int loops = 0;
 
+  //fprintf(stderr, "le_pk %d %d\n", begin, multiloop);
+
   for (int i=begin+1; i<end; i++) {
     ///TODO dangles == 0
     if (str[i]>i && str[i]>alone_upto && str[i]<end) { // '(' ,but not nested '('
@@ -271,6 +273,7 @@ int loop_energy_pk(int begin, short *str, short *s0, short *s1, paramT *P, bool 
         alone_upto = str[i];
       } else {
         energy += Ext_Loop(i, str[i], s0, P);
+        //fprintf(stderr, "le_pk EXT %d %d %d\n", i, str[i], energy);
         alone_upto = str[i];
       }
 
@@ -349,7 +352,7 @@ LE_ret loop_energy_rec(int i, short *str, short *s0, short *s1, paramT *P, Helpe
   ret.pk_ending = ret.ending;
 
   // debug:
-  //fprintf(stderr, "%4d called loop_energy_rec\n", begin);
+  //fprintf(stderr, "%4d called loop_energy_rec %s\n", begin, pt_to_str_pk(str).c_str());
 
   // if we have done it before:
   /*if (0 && str_type[i]!=ROOT) {
@@ -482,6 +485,8 @@ LE_ret loop_energy_rec(int i, short *str, short *s0, short *s1, paramT *P, Helpe
   }
   hlps.str_energy[pk[0]] = energy;
 
+  //fprintf(stderr, "%4d  ended loop_energy_rec\n", begin);
+
   return ret;
 }
 
@@ -501,7 +506,11 @@ void Helpers::Create(int length)
 
 int energy_of_struct_pk(const char *seq, char *structure, int verbose)
 {
-  make_pair_matrix();
+  if (P == NULL) {
+    make_pair_matrix();
+    update_fold_params();
+    P = scale_parameters();
+  }
   short *str = make_pair_table_PK(structure);
   int res = energy_of_struct_pk(seq, str, verbose);
   free(str);
@@ -510,7 +519,11 @@ int energy_of_struct_pk(const char *seq, char *structure, int verbose)
 
 int energy_of_struct_pk(const char *seq, short *structure, int verbose)
 {
-  make_pair_matrix();
+  if (P == NULL) {
+    make_pair_matrix();
+    update_fold_params();
+    P = scale_parameters();
+  }
   short *s0 = encode_sequence(seq, 0);
   short *s1 = encode_sequence(seq, 1);
 
@@ -527,6 +540,7 @@ int energy_of_struct_pk(const char *seq, short *structure, short *s0, short *s1,
   clock_t time = clock();
 
   if (P == NULL) {
+    make_pair_matrix();
     update_fold_params();
     P = scale_parameters();
   }
@@ -1002,7 +1016,7 @@ INS_FLAG Structure::ViableInsert(int left, int right, bool insert)
     // now we have the numbers which we border (0-3), the rest should be checked if we can insert it in it
     int inside = cross_pk->Inside(str, left, right);
     if (inside>=0) {
-      // check if neighbourhood fits
+      // check if neighbourhood fits  // essentially numbers[x] == Imat(x, inside)
       int k=0;
       for (int i=0; i<cross_pk->size; i++) {
         if (cross_pk->Imat(inside, i)) {
@@ -1011,6 +1025,9 @@ INS_FLAG Structure::ViableInsert(int left, int right, bool insert)
           else return NO_INS;
         }
       }
+      // lastly check if we do not cross more than we should
+      if (k != (int)numbers.size()) return NO_INS;
+
       // neighbourhood fits -> we can insert it in the parts[inside]
       if (insert) cross_pk->parts[inside].insert(left);
       res = INSIDE_PK;

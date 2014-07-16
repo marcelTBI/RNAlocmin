@@ -196,7 +196,8 @@ int main(int argc, char **argv)
       int res = move(structs, output, output_shallow, sqi);
 
       // first print out
-      if (Opt.verbose_lvl>0 && num_moves%10000==0) fprintf(stderr, "processed %d, minima %d, time %f secs.\n", num_moves, count, (clock()-clck1)/(double)CLOCKS_PER_SEC);
+      //if (Opt.verbose_lvl>0 && num_moves%10000==0) fprintf(stderr, "processed %d, minima %d, time %f secs.\n", num_moves, count, (clock()-clck1)/(double)CLOCKS_PER_SEC);
+      if (Opt.verbose_lvl>0 && num_moves%(Opt.pknots?1000:10000)==0) fprintf(stderr, "processed %d, minima %d, time %f secs.\n", num_moves, count, (clock()-clck1)/(double)CLOCKS_PER_SEC);
 
       // then evaluate results
       if (res==0)   continue; // same structure has been processed already
@@ -841,7 +842,7 @@ int move(unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs, map<
     free(line);
     return 0;
   } else {
-    str.energy = Opt.pknots? energy_of_struct_pk(sqi.seq, str.structure, sqi.s0, sqi.s1, 0):energy_of_structure_pt(sqi.seq, str.structure, sqi.s0, sqi.s1, 0);
+    str.energy = Opt.pknots? energy_of_struct_pk(sqi.seq, str.structure, sqi.s0, sqi.s1, Opt.verbose_lvl>3):energy_of_structure_pt(sqi.seq, str.structure, sqi.s0, sqi.s1, 0);
     free(line);
   }
 

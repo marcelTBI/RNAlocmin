@@ -37,6 +37,7 @@ void SeqInfo::Init(char *seq) {
   this->seq = (char*) malloc(sizeof(char)*strlen(seq)+1);
   strcpy(this->seq, seq);
   make_pair_matrix();
+  update_fold_params();
   s0 = encode_sequence(seq, 0);
   s1 = encode_sequence(seq, 1);
 }

@@ -286,13 +286,13 @@ int insertions_pk(Encoded *Enc, Structure *str, Structure *minim)
             cnt += update_deepest(Enc, str, minim);
             /* in case useFirst is on and structure is found, end*/
             if (Enc->first && cnt > 0) return cnt;
-          } else  {
+          } /*else  {
             str->str[i] = j;
             str->str[j] = i;
-            //fprintf(stdout, "%s    BAD\n", pt_to_str_pk(str->str).c_str());
+            fprintf(stdout, "%s    BAD\n", pt_to_str_pk(str->str).c_str());
             str->str[i] = 0;
             str->str[j] = 0;
-          }
+          }*/
         }
       }
     }
@@ -314,7 +314,7 @@ int move_set(Encoded *Enc, Structure *str_in)
   Structure *min = new Structure(*str);
   Enc->current_en = str->energy;
 
-  if (Enc->verbose_lvl>0) { fprintf(stderr, "  start of MS:\n  "); print_str_pk(stderr, str->str); fprintf(stderr, " %d\n\n", str->energy); }
+  if (Enc->verbose_lvl>1) { fprintf(stderr, "  start of MS:\n  "); print_str_pk(stderr, str->str); fprintf(stderr, " %d\n\n", str->energy); }
 
   /* if using first dont do all of them*/
   bool end = false;
@@ -422,7 +422,7 @@ int move_rset(Encoded *Enc, Structure *str_in)
   Structure *min = new Structure(*str);
   Enc->current_en = str->energy;
 
-  if (Enc->verbose_lvl>0) { fprintf(stderr, "  start of MR:\n  "); print_str_pk(stderr, str->str); fprintf(stderr, " %d\n\n", str->energy); }
+  if (Enc->verbose_lvl>1) { fprintf(stderr, "  start of MR:\n  "); print_str_pk(stderr, str->str); fprintf(stderr, " %d\n\n", str->energy); }
 
   // construct and permute possible moves
   construct_moves(Enc, str->str);
