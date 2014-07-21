@@ -749,7 +749,11 @@ bool Pseudoknot::Delete(int left)
       // change type?
       if (parts[i].empty()) {
         size--;
-        if (size==1) return true;
+        if (size==1) return true; // cancelled H type
+        if (size==2 && i==1 && !imat[0][2]) { // cancelled K type
+          size--;
+          return true;
+        }
         for (int j=0; j<size; j++) {
           int jj = j>=i?j+1:j;
           for (int k=j+1; k<size; k++) {

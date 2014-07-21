@@ -67,6 +67,8 @@ public:
 enum INS_FLAG {NO_INS, REG_INS, INSIDE_PK, CREATE_PK, CHNG_PK};
 
 class Structure {
+
+public:
   // pknots:
   std::vector<Pseudoknot> pknots;
 
