@@ -336,6 +336,7 @@ LE_ret loop_energy_rec(int i, short *str, short *s0, short *s1, paramT *P, Helpe
 
   int last_pk = 0;
   int pk[4] = {i,0,0,0};
+  int pk_outer[4] = {i,0,0,0};
 
   int reg_inloops = 0;
   int next_i;
@@ -343,7 +344,7 @@ LE_ret loop_energy_rec(int i, short *str, short *s0, short *s1, paramT *P, Helpe
   //int ending = str[begin];
   i++;
 
-  #define END() str[pk[last_pk]]
+  #define END() str[pk_outer[last_pk]]
 
   LE_ret ret;
   ret.energy = 0;
@@ -402,6 +403,7 @@ LE_ret loop_energy_rec(int i, short *str, short *s0, short *s1, paramT *P, Helpe
         opening++;
         if (max_op < opening) max_op = opening;
         pk[last_pk] = i;
+        pk_outer[last_pk] = i;
         ret.pk_ending = max(ret.pk_ending, (int)str[i]);
       }
       // now we can do the left & right stacking:
@@ -1112,7 +1114,7 @@ bool Structure::Delete(int left)
         // erase the pknot and fix bpair_pknot
         pknots.erase(pknots.begin()+i);
         for (map<int, int>::iterator it=bpair_pknot.begin(); it!=bpair_pknot.end(); it++) {
-          if (it->second >= (int)i) it->second++;
+          if (it->second >= (int)i) it->second--;
         }
       }
       break;

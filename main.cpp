@@ -588,7 +588,7 @@ char *read_previous(char *previous, map<struct_en, int, comps_entries> &output)
     sscanf(p, "%d", &num);
     p = strtok(NULL, " \t\n");
     if (p && isStruct(p)) {
-      he.structure = make_pair_table(p);
+      he.structure = make_pair_table_PK(p);
     }
     p = strtok(NULL, " \t\n");
     if (p && he.structure && he.energy==INT_MAX) {
@@ -669,7 +669,7 @@ char *read_barr(char *barr_arg, map<struct_en, barr_info, comps_entries> &output
     sscanf(p, "%d", &num);
     p = strtok(NULL, " \t\n");
     if (p && isStruct(p)) {
-      he.structure = make_pair_table(p);
+      he.structure = make_pair_table_PK(p);
     }
     p = strtok(NULL, " \t\n");
     if (p && he.structure && he.energy==INT_MAX) {
@@ -757,7 +757,7 @@ char *read_seq(char *seq_arg, char **name_out)
   }
   // seq on more lines??
   char *seq2;
-  while ((seq2=my_getline(fseq))!=NULL) {
+  while ((seq2=my_getline(fseq))!=NULL && isSeq(seq2)) {
     seq = (char*) realloc(seq, sizeof(char)*(strlen(seq)+strlen(seq2)+1));
     strcpy(seq+strlen(seq), seq2);
     free(seq2);

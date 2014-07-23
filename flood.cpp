@@ -139,10 +139,10 @@ struct_en* flood(const struct_en &he, SeqInfo &sqi, int &saddle_en, int maxh, bo
 
       // get structure
       Structure *he_top = neighs2.top();
-      neighs.pop();
+      neighs2.pop();
       energy_lvl = he_top->energy;
 
-      if (Opt.verbose_lvl>2) fprintf(stderr, "  neighbours of: %s %.2f\n", pt_to_str(he_top->str).c_str(), he_top->energy/100.0);
+      if (Opt.verbose_lvl>2) fprintf(stderr, "  neighbours of: %s %.2f (%d)\n", pt_to_str(he_top->str).c_str(), he_top->energy/100.0, neighs2.size());
 
       int verbose = Opt.verbose_lvl<2?0:Opt.verbose_lvl-2;
       he_top->energy = browse_neighs_pk_pt(sqi.seq, he_top, sqi.s0, sqi.s1, verbose, flood_func2);
