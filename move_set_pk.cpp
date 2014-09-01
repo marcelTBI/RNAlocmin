@@ -193,10 +193,11 @@ int update_deepest(Encoded *Enc, Structure *str, Structure *min)
       //print_stren(stderr, str); // fprintf(stderr, " %6.2f\n", str->energy);
       Enc->unprocessed[Enc->end_unpr] = new Structure(*str);
       if (Enc->end_unpr == MAX_DEGEN) {
-        fprintf(stderr, "Dseq %s\n", Enc->seq);
+        fprintf(stderr, "ERROR: Degeneracy too high!!! %s\n", Enc->seq);
         for (int j=Enc->begin_unpr; j<Enc->end_unpr; j++) {
-          fprintf(stderr, "D%3d %s %6.2f\n", j, pt_to_str_pk(Enc->unprocessed[j]->str).c_str(), Enc->unprocessed[j]->energy);
+          fprintf(stderr, "D%3d %s %6.2f\n", j, pt_to_str_pk(Enc->unprocessed[j]->str).c_str(), Enc->unprocessed[j]->energy/100.0);
         }
+				exit(EXIT_FAILURE);
       }
       Enc->end_unpr++;
     }

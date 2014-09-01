@@ -195,11 +195,11 @@ int main(int argc, char **argv)
     while (!args_info.find_num_given || count != args_info.find_num_arg) {
       int res = move(structs, output, output_shallow, sqi);
 
-      // first print out
+      // print out
       //if (Opt.verbose_lvl>0 && num_moves%10000==0) fprintf(stderr, "processed %d, minima %d, time %f secs.\n", num_moves, count, (clock()-clck1)/(double)CLOCKS_PER_SEC);
-      if (Opt.verbose_lvl>0 && num_moves%(Opt.pknots?1000:10000)==0) fprintf(stderr, "processed %d, minima %d, time %f secs.\n", num_moves, count, (clock()-clck1)/(double)CLOCKS_PER_SEC);
+      if (Opt.verbose_lvl>0 && num_moves%(Opt.pknots?1000:10000)==0 && num_moves!=0) fprintf(stderr, "processed %d, minima %d, time %f secs.\n", num_moves, (int)output.size(), (clock()-clck1)/(double)CLOCKS_PER_SEC);
 
-      // then evaluate results
+      // evaluate results
       if (res==0)   continue; // same structure has been processed already
       if (res==-1)  break; // error or end
       if (res==-2)  not_canonical++;
@@ -778,9 +778,6 @@ char *read_seq(char *seq_arg, char **name_out)
 
 int move(unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs, map<struct_en, int, comps_entries> &output, set<struct_en, comps_entries> &output_shallow, SeqInfo &sqi)
 {
-  // count moves
-  num_moves++;
-
   // read a line
   char *line = my_getline(stdin);
   if (line == NULL) return -1;
@@ -822,6 +819,9 @@ int move(unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs, map<
     free(line);
     return 0;
   }
+
+  // count moves
+  num_moves++;
 
   // find length of structure
   int len=0;
@@ -882,7 +882,7 @@ int move(unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs, map<
 
     // descend
     move_set(str, sqi);
-    // only H type allowed!!!
+    // only some types of PK allowed!!!
     if (Opt.pknots && str.energy == INT_MAX) {
       free(str.structure);
       free(old.structure);
