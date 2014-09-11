@@ -18,6 +18,8 @@ priority_queue<Structure*, vector<Structure*>, comps_entries_rev> neighs2;
 int energy_lvl;
 bool debugg;
 int top_lvl;
+int min_lvl;
+bool minh_total;
 bool found_exit;
 // hash for the flooding
 unordered_set<struct_en*, hash_fncts, hash_eq> hash_flood (HASHSIZE);
@@ -39,6 +41,27 @@ int flood_func(struct_en *input, struct_en *output)
   } else {
     // found escape? (its energy is lower than our energy lvl and we havent seen it)
     if (input->energy < energy_lvl) {
+      // if minh_total, then continue:
+      if (minh_total) {
+        // if we are lower than our min_lvl, we have found the exit:
+        if (input->energy < min_lvl) {
+          copy_se(output, input);
+          found_exit = true;
+          if (debugg) fprintf(stderr,   "    escape(min): %s %.2f\n", pt_to_str(input->structure).c_str(), input->energy/100.0);
+          return 1;
+        } else {
+          //add it:
+          if (debugg) fprintf(stderr, "    adding(min): %s %.2f\n", pt_to_str(input->structure).c_str(), input->energy/100.0);
+          // just add it to the queue... and to hash
+          struct_en *he_tmp = (struct_en*)space(sizeof(struct_en));
+          he_tmp->structure = allocopy(input->structure);
+          he_tmp->energy = input->energy;
+          neighs.push(he_tmp);
+          hash_flood.insert(he_tmp);
+          return 0;
+        }
+      }
+
       // ends flood and return it as a structure to walk down
       copy_se(output, input);
       found_exit = true;
@@ -74,9 +97,29 @@ int flood_func2(Structure *input, Structure *output)
   } else {
     // found escape? (its energy is lower than our energy lvl and we havent seen it)
     if (input->energy < energy_lvl) {
+      // if minh_total, then continue:
+      if (minh_total) {
+        // if we are lower than our min_lvl, we have found the exit:
+        if (input->energy < min_lvl) {
+          // ends flood and return it as a structure to walk down
+          *output = *input;
+          found_exit = true;
+          if (debugg) fprintf(stderr,   "    escape(min): %s %.2f\n", pt_to_str(input->str).c_str(), input->energy/100.0);
+          return 1;
+        } else {
+          //add it:
+          if (debugg) fprintf(stderr, "    adding(min): %s %.2f\n", pt_to_str(input->str).c_str(), input->energy/100.0);
+          // just add it to the queue... and to hash
+          Structure *str_tmp = new Structure(*input);
+          neighs2.push(str_tmp);
+          hash_flood2.insert(str_tmp);
+          return 0;
+        }
+      }
+
+
       // ends flood and return it as a structure to walk down
       *output = *input;
-      //copy_se(output, input);
       found_exit = true;
       if (debugg) fprintf(stderr,   "       escape  : %s %.2f\n", pt_to_str(input->str).c_str(), input->energy/100.0);
       return 1;
@@ -96,13 +139,27 @@ int flood_func2(Structure *input, Structure *output)
   }
 }
 
-struct_en* flood(const struct_en &he, SeqInfo &sqi, int &saddle_en, int maxh, bool pknots)
+struct_en* flood(const struct_en &he, SeqInfo &sqi, int &saddle_en, int maxh, bool pknots, bool flood_total)
 {
   int count = 0;
   debugg = Opt.verbose_lvl>2;
 
   struct_en *res = NULL;
 
+  // save deg.first + create deg
+  bool first = Opt.first;
+  Opt.first = true;
+
+  // if minh specified, assign top_lvl and flood_total
+  if (maxh>0) {
+    top_lvl = he.energy + maxh;
+    minh_total = flood_total;
+    min_lvl = he.energy;
+  } else {
+    top_lvl = 1e9;
+  }
+
+  ///#### PKNOTS
   if (pknots) {
     // init priority queue
     while (!neighs2.empty()) {
@@ -121,17 +178,6 @@ struct_en* flood(const struct_en &he, SeqInfo &sqi, int &saddle_en, int maxh, bo
       hash_flood2.insert(he_tmp);
     }
 
-    // save deg.first + create deg
-    bool first = Opt.first;
-    Opt.first = true;
-
-    // if minh specified, assign top_lvl
-    if (maxh>0) {
-      top_lvl = he.energy + maxh;
-    } else {
-      top_lvl = 1e9;
-    }
-
     // FLOOOD!
     while ((int)hash_flood2.size() < Opt.floodMax) {
       // should not be empty (only when maxh specified)
@@ -142,7 +188,7 @@ struct_en* flood(const struct_en &he, SeqInfo &sqi, int &saddle_en, int maxh, bo
       neighs2.pop();
       energy_lvl = he_top->energy;
 
-      if (Opt.verbose_lvl>2) fprintf(stderr, "  neighbours of: %s %.2f (%d)\n", pt_to_str(he_top->str).c_str(), he_top->energy/100.0, neighs2.size());
+      if (Opt.verbose_lvl>2) fprintf(stderr, "  neighbours of: %s %.2f (%d)\n", pt_to_str(he_top->str).c_str(), he_top->energy/100.0, (int)neighs2.size());
 
       int verbose = Opt.verbose_lvl<2?0:Opt.verbose_lvl-2;
       he_top->energy = browse_neighs_pk_pt(sqi.seq, he_top, sqi.s0, sqi.s1, verbose, flood_func2);
@@ -160,9 +206,6 @@ struct_en* flood(const struct_en &he, SeqInfo &sqi, int &saddle_en, int maxh, bo
       count++;
     }
 
-    // restore deg options
-    Opt.first = first;
-
     // return status in saddle_en :/
     if (!found_exit) {
       saddle_en = (neighs2.empty() ? 1 : 0);
@@ -176,7 +219,7 @@ struct_en* flood(const struct_en &he, SeqInfo &sqi, int &saddle_en, int maxh, bo
 
     // destroy hash
     free_hash(hash_flood2);
-  } else {
+  } else {  /// ######## NOT PKNOTS!!!
     // init priority queue
     while (!neighs.empty()) {
       //fprintf(stderr, "-neighs size: %d\n", (int)neighs.size());
@@ -193,17 +236,6 @@ struct_en* flood(const struct_en &he, SeqInfo &sqi, int &saddle_en, int maxh, bo
       struct_en *he_tmp = allocopy_se(&he);
       neighs.push(he_tmp);
       hash_flood.insert(he_tmp);
-    }
-
-    // save deg.first + create deg
-    bool first = Opt.first;
-    Opt.first = true;
-
-    // if minh specified, assign top_lvl
-    if (maxh>0) {
-      top_lvl = he.energy + maxh;
-    } else {
-      top_lvl = 1e9;
     }
 
     // FLOOOD!
@@ -232,9 +264,6 @@ struct_en* flood(const struct_en &he, SeqInfo &sqi, int &saddle_en, int maxh, bo
       count++;
     }
 
-    // restore deg options
-    Opt.first = first;
-
     // return status in saddle_en :/
     if (!found_exit) {
       saddle_en = (neighs.empty() ? 1 : 0);
@@ -248,10 +277,11 @@ struct_en* flood(const struct_en &he, SeqInfo &sqi, int &saddle_en, int maxh, bo
 
     // destroy hash
     free_hash(hash_flood);
-  }
+  }  /// #### END OF PKNOTS BRANCH
+
+  // restore deg options
+  Opt.first = first;
 
   // return found? structure
   return res;
 }
-
-

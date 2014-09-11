@@ -192,7 +192,7 @@ int main(int argc, char **argv)
   if (!args_info.fix_barriers_given) {
     // hash
     unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> structs (HASHSIZE); // structures to minima map
-    while (!args_info.find_num_given || count != args_info.find_num_arg) {
+    while ((!args_info.find_num_given || count != args_info.find_num_arg) && !args_info.just_read_flag) {
       int res = move(structs, output, output_shallow, sqi);
 
       // print out
@@ -244,7 +244,7 @@ int main(int argc, char **argv)
         // first check if the output is not shallow
         if (Opt.minh>0) {
           int saddle;
-          struct_en *escape = flood(it->first, sqi, saddle, Opt.minh, args_info.pseudoknots_flag);
+          struct_en *escape = flood(it->first, sqi, saddle, Opt.minh, args_info.pseudoknots_flag, !args_info.minh_lite_flag);
 
           if (args_info.verbose_lvl_arg>0 && ii%100 == 0) {
             fprintf(stderr, "non-shallow remained: %d / %d; time: %.2f secs.\n", i, ii, (clock()-clck1)/(double)CLOCKS_PER_SEC);
@@ -735,37 +735,53 @@ char *read_seq(char *seq_arg, char **name_out)
 {
   char *name = NULL;
   char *seq = NULL;
+  bool have_seq = false;
   // read sequence
   FILE *fseq;
   fseq = fopen(seq_arg, "r");
   if (fseq == NULL) {
-    fprintf(stderr, "Cannot open file \"%s\".\n", seq_arg);
-    exit(EXIT_FAILURE);
+    fprintf(stderr, "WARNING: Cannot open file \"%s\".\n", seq_arg);
+    // try to read it from 1st line of input:
+    seq = my_getline(stdin);
+    int j = 0;
+    for (unsigned int i=0; i<strlen(seq); i++) {
+      if (seq[i]=='A' || seq[i]=='C' || seq[i]=='T' || seq[i]=='G' || seq[i]=='a' || seq[i]=='c' || seq[i]=='t' || seq[i]=='g' || seq[i]=='U' || seq[i]=='u') seq[j++] = seq[i];
+    }
+    seq[j]='\0';
+    seq = (char*)realloc(seq, sizeof(char)*(j+1));
+    if (j<5) {
+      fprintf(stderr, "ERROR: Sequence not found in input nor in \"%s\" file.\n", seq_arg);
+      exit(EXIT_FAILURE);
+    } else {
+      have_seq = true;
+    }
   }
-  name = my_getline(fseq);
-  if (name == NULL) {
-    fprintf(stderr, "File \"%s\" empty.\n", seq_arg);
-    fclose(fseq);
-    exit(EXIT_FAILURE);
-  }
-  seq = my_getline(fseq);
-  if (seq == NULL || name[0]!='>') {
-    //fprintf(stderr, "WARNING: File \"%s\" not in FASTA format. Using it as a sequence.\n", seq_arg);
-    if (seq!=NULL) free(seq);
-    seq = name;
-    name = NULL;
-  }
-  // seq on more lines??
-  char *seq2;
-  while ((seq2=my_getline(fseq))!=NULL && isSeq(seq2)) {
-    seq = (char*) realloc(seq, sizeof(char)*(strlen(seq)+strlen(seq2)+1));
-    strcpy(seq+strlen(seq), seq2);
-    free(seq2);
-    fprintf(stderr, "%s %d\n", seq, (int)strlen(seq));
-  }
+  if (!have_seq) {
+    name = my_getline(fseq);
+    if (name == NULL) {
+      fprintf(stderr, "ERROR: File \"%s\" empty.\n", seq_arg);
+      fclose(fseq);
+      exit(EXIT_FAILURE);
+    }
+    seq = my_getline(fseq);
+    if (seq == NULL || name[0]!='>') {
+      //fprintf(stderr, "WARNING: File \"%s\" not in FASTA format. Using it as a sequence.\n", seq_arg);
+      if (seq!=NULL) free(seq);
+      seq = name;
+      name = NULL;
+    }
+    // seq on more lines??
+    char *seq2;
+    while ((seq2=my_getline(fseq))!=NULL && isSeq(seq2)) {
+      seq = (char*) realloc(seq, sizeof(char)*(strlen(seq)+strlen(seq2)+1));
+      strcpy(seq+strlen(seq), seq2);
+      free(seq2);
+      //fprintf(stderr, "%s %d\n", seq, (int)strlen(seq));
+    }
 
-  fclose(fseq);
-  if (name) (*name_out) = name;
+    fclose(fseq);
+    if (name) (*name_out) = name;
+  }
 
   // covert seq's T's to U's
   for (int i=0; i<(int)strlen(seq); i++) {

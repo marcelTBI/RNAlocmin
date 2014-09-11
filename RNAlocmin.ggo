@@ -12,14 +12,15 @@ args "--file-name=RNAlocmin_cmdline --include-getopt --default-optional --unamed
 
 # Options
 section "General options"
-option "seq"                s "Sequence file in FASTA format" string default="seq.txt"
+option "seq"                s "Sequence file in FASTA format. If the sequence is in the input file, it is not needed." string default="seq.txt"
 option "previous"           p "Previously found LM (output from RNAlocmin), if specified does not need --seq option" string no
 option "move"               m "Move set:\nI ==> insertion & deletion of base pair\nS ==> I&D& switch base pair" values="I","S" default="I" no
-option "min-num"            n "Maximal number of local minima returned\n(0 == unlimited)" int default="100" no
+option "min-num"            n "Maximal number of local minima returned\n(0 == unlimited)" int default="100000" no
 option "find-num"           - "Maximal number of local minima found\n(default = unlimited - crawl through whole file)" int no
 option "verbose-lvl"        v "Level of verbosity (0 = nothing, 4 = full)\n WARNING: higher verbose levels increase computation time" int default="0" no
 option "depth"              - "Depth of findpath search (higher value increases running time)" int default="10" no
 option "minh"               - "Print only minima with energy barrier greater than this" double default="0.0" no
+option "minh-lite"          - "When flooding with --minh option, search for only saddle (do not search for a LM that is lower). Increases efficiency a tiny bit, but when turned on, the results may omit some non-shallow minima, especially with higher --minh value." flag off
 option "noLP"               - "Work only with canonical RNA structures (w/o isolated base pairs, cannot be combined with walk R option)" flag off
 option "walk"               w "Walking method used\nD ==> gradient descent\nF ==> use first found lower energy structure\nR ==> use random lower energy structure (does not work with --noLP and -m S options)" values="D","F","R" default="D" no
 option "useEOS"             e "Use energy_of_structure_pt calculation instead of energy_of_move (slower, it should not affect results)" flag off
@@ -36,6 +37,7 @@ details="\nWith -d1 only unpaired bases can participate in at most one dangling 
  energy model.\n\n" int default="2" optional
 option "fix-barriers"       - "Fix barrier file for interior loops (just recompute if all LM in barrier output are LM), if specified, does not need neither --previous nor --seq option" string no hidden
 option "pseudoknots"        k "Allow for pseudoknots according to \"gfold\" model - H, K, L, and M types (genus one) of pseudoknots are allowed. (slower)" flag off
+option "just-read"          - "Do not assume further input, just do postprocessing." flag off
 
 section "Misc"
 option "numIntervals"       - "Number of intervals for Jing's visualisation" int default="0" no hidden
