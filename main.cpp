@@ -65,7 +65,7 @@ inline bool isSeq(char *p)
 inline bool isStruct(char *p)
 {
   // check first two chars - should be enough
-  if ((p[0]=='.' || p[0]=='(' || p[0]==')') && (p[1]=='.' || p[1]=='(' || p[1]==')')) return true;
+  if ((p[0]=='.' || p[0]=='(') && (p[1]=='.' || p[1]=='(' || p[1]=='[')) return true;
   else return false;
 }
 
@@ -261,7 +261,7 @@ int main(int argc, char **argv)
           }
         }
 
-        if (args_info.verbose_lvl_arg > 2) fprintf(stderr, "%4d %s %6.2f\n", i, pt_to_str_pk(it->first.structure).c_str(), it->first.energy/100.0);
+        if (args_info.verbose_lvl_arg > 2) fprintf(stderr, "%4d %s %6.2f %6d\n", i+1, pt_to_str_pk(it->first.structure).c_str(), it->first.energy/100.0, it->second);
         output_str[i]=pt_to_str_pk(it->first.structure);
         output_num[i]=it->second;
         output_he[i]=it->first;
