@@ -308,9 +308,15 @@ struct LE_ret {
   int pk_loops; // number of pknot loops
 };
 
+void try_pk() {
+  energy_of_struct_pk("CCCCCCCCCCGGCCCCGGGGGGGGG",
+                      "(((..((...)).[[[)))...]]]", 4);
+}
+
+// checks if we are inside of pknot or inside something else (return true if inside pknot)
 bool OKStack(vector<int> &stack, int pk[4]) {
   if (stack.size() == 0) return true;
-  int data = stack[stack.size()-1];
+  int data = stack.back();
   return data==pk[0] || data==pk[1] || data==pk[2] || data==pk[3];
 }
 
@@ -465,18 +471,22 @@ LE_ret loop_energy_rec(int i, short *str, short *s0, short *s1, paramT *P, Helpe
         }
       } else if (str[j] > j) {
         int k=0;
-        while (stacks[k].size() > 0 && str[j]>str[stacks[k][stacks[k].size()-1]]) k++;
+        while (stacks[k].size() > 0 && str[j]>str[stacks[k].back()]) k++;
         stacks[k].push_back(j);
       } else if (str[j] < j) {
         int k=0;
-        while (k<3 && (stacks[k].size() == 0 || str[j] != stacks[k][stacks[k].size()-1])) k++;
+        while (k<3 && (stacks[k].size() == 0 || str[j] != stacks[k].back())) k++;
         if (k<3) stacks[k].pop_back();
       }
     }
-
+    hlps.beta1 = energy;
     energy += beta2_pen[type]*(bpairs+last_pk+1) + beta3_pen[type]*(alone);
+    hlps.beta2 = bpairs+last_pk+1;
+    hlps.beta3 = alone;
+
     // weird 0.1:
     if (type == P_L || type == P_K || type == P_M) energy -= 10;
+
     ret.energy += energy;
     ret.pk_loops = max(last_pk+1, ret.pk_loops);
   }
@@ -503,7 +513,7 @@ void Helpers::Create(int length)
   str_type.resize(length+1, ROOT);
   str_toleft.resize(length+1, 0);
   str_torght.resize(length+1, 0);
-  last_open = 0;
+  beta1 = beta2 = beta3 = last_open = 0;
 }
 
 int energy_of_struct_pk(const char *seq, char *structure, int verbose)
@@ -553,8 +563,6 @@ int energy_of_struct_pk(const char *seq, short *structure, short *s0, short *s1,
 
   int energy = 0;
 
-  if (verbose) fprintf(stderr, "%s\n%s", seq, pt_to_str_pk(structure).c_str());
-
   // go through the structure:
   for (int i=1; i<=str[0]; i++) {
     if (str[i]>i && hlps.str_type[i]==ROOT) {  //'('
@@ -562,6 +570,10 @@ int energy_of_struct_pk(const char *seq, short *structure, short *s0, short *s1,
       LE_ret ret = loop_energy_rec(i, str, s0, s1, P, hlps);
       i = ret.ending;
       energy += ret.energy;
+      // just verbose
+      if (verbose && hlps.beta1 != 0) {
+        fprintf(stderr, "found pknot: %4d %4d %4d\n", hlps.beta1, hlps.beta2, hlps.beta3);
+      }
     }
   }
 
@@ -575,6 +587,7 @@ int energy_of_struct_pk(const char *seq, short *structure, short *s0, short *s1,
     type += bpair_type_sname[hlps.str_type[i]];
   }
 
+  if (verbose) fprintf(stderr, "%s\n%s", seq, pt_to_str_pk(structure).c_str());
   if (verbose) fprintf(stderr, " %7.2f\n%s\n", energy/100.0, type.c_str());
 
   if (verbose) {
@@ -882,8 +895,8 @@ bool const Structure::operator<(const Structure &second) const
   while (i<=str[0]) {
     l = (str[i]==0?'.':(str[i]<str[str[i]]?')':'('));
     r = (second.str[i]==0?'.':(second.str[i]<second.str[second.str[i]]?')':'('));
-    if (l != r) return l>r;
-    if (str[i] != second.str[i]) return str[i] > second.str[i];
+    if (l != r) return l<r;
+    //if (str[i] != second.str[i]) return str[i] > second.str[i];
     i++;
   }
 
@@ -1127,14 +1140,100 @@ bool Structure::Delete(int left)
   return true;
 }
 
+int Structure::UndoMove()
+{
+  if (undo_l == 0) {
+    fprintf(stderr, "ERROR: Undoing non-existent move!\n");
+    return 0;
+  }
+
+  int left = undo_l;
+  int right = undo_r;
+
+  int dif_en = - energy + undo_en;
+  energy = undo_en;
+
+  // switch?
+  if (left>0 && right>0 && (str[left]>0 || str[right]>0)) {
+    Shift(left, right);
+  } else {
+    if (left<0) {
+      Delete(left);
+    } else {
+      Insert(left, right);
+    }
+  }
+
+  undo_l = 0;
+  undo_r = 0;
+  undo_en = 0;
+
+  return dif_en;
+}
+
 int Structure::MakeMove(const char *seq, short *s0, short *s1, int left, int right)
 {
-  int old_energy = energy;
+  undo_en = energy;
   bool change = false;
-  if (left<0) change = Delete(left);
-  else change = (Insert(left, right) != NO_INS);
+
+  // switch?
+  if (left>0 && right>0 && (str[left]>0 || str[right]>0)) {
+    if (str[left]>0) {
+      undo_l = left;
+      undo_r = str[left];
+    } else {
+      undo_r = right;
+      undo_l = str[right];
+    }
+    change = (Shift(left, right) != NO_INS);
+  } else {
+    if (left<0) {
+      undo_l = -left;
+      undo_r = -right;
+      change = Delete(left);
+    } else {
+      undo_l = -left;
+      undo_r = -right;
+      change = (Insert(left, right) != NO_INS);
+    }
+  }
+
   if (change) energy = energy_of_struct_pk(seq, str, s0, s1, 0);
-  return energy - old_energy;
+  return energy - undo_en;
+}
+
+INS_FLAG Structure::CanShift(int left, int right)
+{
+  if ((str[left]>0 && str[right]>0)  ||
+      (str[left]==0 && str[right]==0)) return NO_INS;
+
+  int left_orig = str[left]>0? left : str[right];
+  int right_orig = str[right]>0? right : str[left];
+
+  Delete(left_orig);
+
+  INS_FLAG flag = CanInsert(left, right);
+
+  Insert(left_orig, right_orig);
+
+  return flag;
+}
+
+INS_FLAG Structure::Shift(int left, int right)
+{
+  if ((str[left]>0 && str[right]>0)  ||
+      (str[left]==0 && str[right]==0)) return NO_INS;
+
+  int left_orig = str[left]>0? left : str[right];
+  int right_orig = str[right]>0? right : str[left];
+
+  Delete(left_orig);
+
+  INS_FLAG flag = Insert(left, right);
+
+  if (flag==NO_INS) Insert(left_orig, right_orig);
+
+  return flag;
 }
 
 INS_FLAG Structure::CanInsert(int left, int right)

@@ -31,7 +31,7 @@ bool compf_entries2 (const struct_en &lhs, const struct_en &rhs)
 }
 
 bool compf_short_rev (const short *lhs, const short *rhs) {
-  int i=1;
+  /*int i=1;
   char l,r;
   while (i<=lhs[0]) {
     l = (lhs[i]==0?'.':(lhs[i]<lhs[lhs[i]]?')':'('));
@@ -39,7 +39,8 @@ bool compf_short_rev (const short *lhs, const short *rhs) {
     if (l != r) break;
     i++;
   }
-  return (i<=lhs[0] && l>r);
+  return (i<=lhs[0] && l>r);  /// REVERSE ORDERING*/
+  return compf_short(rhs, lhs);
 }
 
 bool compf_entries_rev (const struct_en *lhs, const struct_en *rhs) {

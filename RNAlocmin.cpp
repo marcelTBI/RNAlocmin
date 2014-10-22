@@ -121,7 +121,7 @@ int move_set(struct_en &input, SeqInfo &sqi)
   if (Opt.pknots && Contains_PK(input.structure)) {
     MOVE_TYPE mt = Opt.rand?ADAPTIVE:Opt.first?FIRST:GRADIENT;
     Structure str(sqi.seq, input.structure, sqi.s0, sqi.s1);
-    input.energy = move_standard_pk_pt(sqi.seq, &str, sqi.s0, sqi.s1, mt, Opt.verbose_lvl);
+    input.energy = move_standard_pk_pt(sqi.seq, &str, sqi.s0, sqi.s1, mt, Opt.shift, Opt.verbose_lvl);
     copy_arr(input.structure, str.str);
   } else {
     if (Opt.rand) input.energy = move_adaptive(sqi.seq, input.structure, sqi.s0, sqi.s1, verbose);

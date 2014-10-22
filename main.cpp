@@ -255,7 +255,8 @@ int main(int argc, char **argv)
             if (args_info.verbose_lvl_arg>1) {
               fprintf(stderr, "shallow: %s %6.2f (saddle: %s %6.2f)\n", pt_to_str_pk(it->first.structure).c_str(), it->first.energy/100.0, pt_to_str_pk(escape->structure).c_str(), escape->energy/100.0);
             }
-            free_se(escape);
+            free(escape->structure);
+            free(escape);
             free(it->first.structure);
             continue;
           }
@@ -389,7 +390,8 @@ int main(int argc, char **argv)
               //fprintf(stderr, "join: %d %d\n", min(i, pos), max(i, pos));
               union_set(min(i, pos), max(i, pos));
             }
-            free_se(he);
+            free(he->structure);
+            free(he);
           }
         }
       }

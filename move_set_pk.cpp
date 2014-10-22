@@ -66,15 +66,13 @@ typedef struct _Encoded {
   /* moves*/
   int   bp_left;
   int   bp_right;
-  /*int   bp_left2;   // if noLP is enabled (and for shift moves)
-  int   bp_right2;*/
 
   /* options*/
   //int noLP;
   int verbose_lvl;
   int first;
-  //int shift;
-  int all_neighs;
+  int shift;
+  int all_neighs; // sould be on for shifts!
 
   /* degeneracy*/
   int begin_unpr;
@@ -148,7 +146,7 @@ int update_deepest(Encoded *Enc, Structure *str, Structure *min)
     int end = Enc->funct(str, min);
 
     // undo moves
-    str->MakeMove(Enc->seq, Enc->s0, Enc->s1, -Enc->bp_left, -Enc->bp_right);
+    str->UndoMove();
     Enc->bp_left=0;
     Enc->bp_right=0;
 
@@ -166,7 +164,7 @@ int update_deepest(Encoded *Enc, Structure *str, Structure *min)
     free_degen(Enc);
 
     /* undo moves*/
-    str->MakeMove(Enc->seq, Enc->s0, Enc->s1, -Enc->bp_left, -Enc->bp_right);
+    str->UndoMove();
     Enc->bp_left=0;
     Enc->bp_right=0;
     return 1;
@@ -190,12 +188,16 @@ int update_deepest(Encoded *Enc, Structure *str, Structure *min)
     }
 
     if (!found) {
-      //print_stren(stderr, str); // fprintf(stderr, " %6.2f\n", str->energy);
+      //fprintf(stderr, "%s %6.2f\n", pt_to_str_pk(str->str).c_str(), str->energy);
       Enc->unprocessed[Enc->end_unpr] = new Structure(*str);
       if (Enc->end_unpr == MAX_DEGEN) {
         fprintf(stderr, "ERROR: Degeneracy too high!!! %s\n", Enc->seq);
         for (int j=Enc->begin_unpr; j<Enc->end_unpr; j++) {
           fprintf(stderr, "D%3d %s %6.2f\n", j, pt_to_str_pk(Enc->unprocessed[j]->str).c_str(), Enc->unprocessed[j]->energy/100.0);
+        }
+        fprintf(stderr, "\n");
+        for (int j=Enc->begin_pr; j<Enc->end_pr; j++) {
+          fprintf(stderr, "D%3d %s %6.2f\n", j, pt_to_str_pk(Enc->processed[j]->str).c_str(), Enc->processed[j]->energy/100.0);
         }
 				exit(EXIT_FAILURE);
       }
@@ -204,7 +206,7 @@ int update_deepest(Encoded *Enc, Structure *str, Structure *min)
   }
 
   /* undo moves*/
-  str->MakeMove(Enc->seq, Enc->s0, Enc->s1, -Enc->bp_left, -Enc->bp_right);
+  str->UndoMove();
   Enc->bp_left=0;
   Enc->bp_right=0;
   return 0;
@@ -254,6 +256,14 @@ inline bool try_insert(const short *pt, const char *seq, int i, int j)
 {
   if (i<=0 || j<=0 || i>pt[0] || j>pt[0]) return false;
   return (j-i>MINGAP && pt[j]==0 && pt[i]==0 && compat(seq[i-1], seq[j-1]));
+}
+
+/* try switch base pair (i,j)*/
+inline bool try_shift(const short *pt, const char *seq, int i, int j)
+{
+  if (i<=0 || j<=0 || i>pt[0] || j>pt[0]) return false;
+  return (j-i>MINGAP && compat(seq[i-1], seq[j-1]) &&
+          ((pt[i]==0 && pt[j]!=0) || (pt[i]!=0 && pt[j]==0)) );
 }
 
 // try insert base pair (i,j)
@@ -307,6 +317,64 @@ int insertions_pk(Encoded *Enc, Structure *str, Structure *minim)
   return cnt;
 }
 
+/* shifts move set*/
+int shifts_pk(Encoded *Enc, Structure *str, Structure *minim)
+{
+  int cnt = 0;
+  short *pt = str->str;
+  int len = pt[0];
+  int i,j;
+
+  for (i=1; i<=len; i++) {
+    if (pt[i]==0) continue;
+
+    // first '('
+    if (pt[i]>i) {
+
+      for (j=i+1; j<=len; j++) {
+
+        if (try_shift(pt, Enc->seq, i, j)) {
+          INS_FLAG iflag = str->CanShift(i, j);
+          if (iflag != NO_INS && (Enc->all_neighs || iflag == REG_INS || iflag == INSIDE_PK)) {
+            Enc->bp_left=i;
+            Enc->bp_right=j;
+
+            //fprintf(stderr, "CS: %4d %4d\n", i, j);
+
+
+            cnt += update_deepest(Enc, str, minim);
+            /* in case useFirst is on and structure is found, end*/
+            if (Enc->first && cnt > 0) return cnt;
+          }
+        }
+      }
+    }
+
+    // then ')'
+    if (pt[i]<i) {
+      for (j=1; j<i; j++) {
+
+        if (try_shift(pt, Enc->seq, i, j)) {
+          INS_FLAG iflag = str->CanShift(i, j);
+          if (iflag != NO_INS && (Enc->all_neighs || iflag == REG_INS || iflag == INSIDE_PK)) {
+            Enc->bp_left=i;
+            Enc->bp_right=j;
+
+            //fprintf(stderr, "CS: %4d %4d\n", i, j);
+
+
+            cnt += update_deepest(Enc, str, minim);
+            /* in case useFirst is on and structure is found, end*/
+            if (Enc->first && cnt > 0) return cnt;
+          }
+        }
+      }
+    }
+
+  }
+  return cnt;
+}
+
 /* move to deepest (or first) neighbour*/
 int move_set(Encoded *Enc, Structure *str_in)
 {
@@ -333,6 +401,12 @@ int move_set(Encoded *Enc, Structure *str_in)
   /* deletions*/
   if (!end) cnt += deletions_pk(Enc, str, min);
   if (Enc->first && cnt>0) end = true;
+
+  /* shifts*/
+  if (Enc->shift) {
+    if (!end) cnt += shifts_pk(Enc, str, min);
+    if (Enc->first && cnt>0) end = true;
+  }
 
   /* if degeneracy occurs, solve it!*/
   if (!end && (Enc->end_unpr - Enc->begin_unpr)>0) {
@@ -504,12 +578,13 @@ int move_standard_pk_pt(const char *seq,
                   short *s0,
                   short *s1,
                   enum MOVE_TYPE type,
+                  int shifts,
                   int verbosity_level)
 {
   switch (type){
-  case GRADIENT: move_gradient_pk(seq, str, s0, s1, verbosity_level); break;
-  case FIRST: move_first_pk(seq, str, s0, s1, verbosity_level); break;
-  case ADAPTIVE: move_adaptive_pk(seq, str, s0, s1, verbosity_level); break;
+  case GRADIENT: move_gradient_pk(seq, str, s0, s1, shifts, verbosity_level); break;
+  case FIRST: move_first_pk(seq, str, s0, s1, shifts, verbosity_level); break;
+  case ADAPTIVE: move_adaptive_pk(seq, str, s0, s1, shifts, verbosity_level); break;
   }
 
   return str->energy;
@@ -518,6 +593,7 @@ int move_standard_pk_pt(const char *seq,
 int move_standard_pk(const char *seq,
                   char *struc,
                   enum MOVE_TYPE type,
+                  int shifts,
                   int verbosity_level)
 {
   make_pair_matrix();
@@ -526,7 +602,7 @@ int move_standard_pk(const char *seq,
 
   Structure *str = new Structure(seq, struc, s0, s1);
 
-  int energy = move_standard_pk_pt(seq, str, s0, s1, type, verbosity_level);
+  int energy = move_standard_pk_pt(seq, str, s0, s1, type, shifts, verbosity_level);
 
   free(s0);
   free(s1);
@@ -541,6 +617,7 @@ int move_gradient_pk(const char *seq,
                   Structure *str,
                   short *s0,
                   short *s1,
+                  int shifts,
                   int verbosity_level)
 {
   cnt_move = 0;
@@ -557,7 +634,8 @@ int move_gradient_pk(const char *seq,
   /* options*/
   enc.verbose_lvl=verbosity_level;
   enc.first=0;
-  enc.all_neighs=0;
+  enc.all_neighs=shifts;
+  enc.shift = shifts;
 
   /* degeneracy*/
   enc.begin_unpr=0;
@@ -589,6 +667,7 @@ int move_first_pk(const char *seq,
                   Structure *str,
                   short *s0,
                   short *s1,
+                  int shifts,
                   int verbosity_level)
 {
   cnt_move = 0;
@@ -605,7 +684,8 @@ int move_first_pk(const char *seq,
   /* options*/
   enc.verbose_lvl=verbosity_level;
   enc.first=1;
-  enc.all_neighs=0;
+  enc.all_neighs=shifts;
+  enc.shift = shifts;
 
   /* degeneracy*/
   enc.begin_unpr=0;
@@ -632,6 +712,7 @@ int move_adaptive_pk(const char *seq,
                   Structure *str,
                   short *s0,
                   short *s1,
+                  int shifts,
                   int verbosity_level)
 {
   srand(time(NULL));
@@ -650,7 +731,8 @@ int move_adaptive_pk(const char *seq,
   /* options*/
   enc.verbose_lvl=verbosity_level;
   enc.first=1;
-  enc.all_neighs=0;
+  enc.all_neighs=shifts;
+  enc.shift = shifts;
 
   /* degeneracy*/
   enc.begin_unpr=0;
@@ -683,6 +765,7 @@ int move_adaptive_pk(const char *seq,
 
 int browse_neighs_pk( const char *seq,
                    char *struc,
+                   int shifts,
                    int verbosity_level,
                    int (*funct) (Structure*, Structure*))
 
@@ -693,7 +776,7 @@ int browse_neighs_pk( const char *seq,
 
   Structure *str = new Structure(seq, struc, s0, s1);
 
-  int res = browse_neighs_pk_pt(seq, str, s0, s1, verbosity_level, funct);
+  int res = browse_neighs_pk_pt(seq, str, s0, s1, shifts, verbosity_level, funct);
 
   free(s0);
   free(s1);
@@ -707,6 +790,7 @@ int browse_neighs_pk_pt(const char *seq,
                   Structure *str,
                   short *s0,
                   short *s1,
+                  int shifts,
                   int verbosity_level,
                   int (*funct) (Structure*, Structure*))
 {
@@ -725,6 +809,7 @@ int browse_neighs_pk_pt(const char *seq,
   enc.verbose_lvl=verbosity_level;
   enc.first=1;
   enc.all_neighs=1;
+  enc.shift = shifts;
 
   /* degeneracy*/
   enc.begin_unpr=0;

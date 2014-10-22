@@ -29,6 +29,18 @@ unordered_set<Structure*, hash_fncts, hash_eq> hash_flood2 (HASHSIZE);
 unordered_set<Structure*, hash_fncts, hash_eq>::iterator it_hash2;
 
 
+void copy_se(struct_en *dest, const struct_en *src) {
+  copy_arr(dest->structure, src->structure);
+  dest->energy = src->energy;
+}
+
+struct_en *allocopy_se(const struct_en *src) {
+  struct_en *dest = (struct_en*)malloc(sizeof(struct_en));
+  dest->structure = allocopy(src->structure);
+  dest->energy = src->energy;
+  return dest;
+}
+
 // function to do on all the items...
 int flood_func(struct_en *input, struct_en *output)
 {
@@ -191,7 +203,7 @@ struct_en* flood(const struct_en &he, SeqInfo &sqi, int &saddle_en, int maxh, bo
       if (Opt.verbose_lvl>2) fprintf(stderr, "  neighbours of: %s %.2f (%d)\n", pt_to_str(he_top->str).c_str(), he_top->energy/100.0, (int)neighs2.size());
 
       int verbose = Opt.verbose_lvl<2?0:Opt.verbose_lvl-2;
-      he_top->energy = browse_neighs_pk_pt(sqi.seq, he_top, sqi.s0, sqi.s1, verbose, flood_func2);
+      he_top->energy = browse_neighs_pk_pt(sqi.seq, he_top, sqi.s0, sqi.s1, Opt.shift, verbose, flood_func2);
 
       if (found_exit && Opt.verbose_lvl>2) fprintf(stderr, "sad= %6.2f    : %s %.2f\n", saddle_en/100.0, pt_to_str(he_top->str).c_str(), he_top->energy/100.0);
 

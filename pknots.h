@@ -13,10 +13,10 @@
 enum BPAIR_TYPE {N_S, N_M, P_H, P_K, P_L, P_M, ROOT};
 const char bpair_type_name[][5] = {"S", "M", "P_H", "P_K", "P_L", "P_M", "ROOT"};
 const char bpair_type_sname[] = "smHKLM_";
-const int beta1_pen[] =   {0,    0,  960, 1160, 1360, 1660,    0};  // simple pk penalty
-const int beta1mp_pen[] = {0,    0, 1500, 1700, 1900, 2200,    0};  // pk in a multiloop
-const int beta2_pen[] =   {0,    0,   10,   10,   10,   10,    0};  // penalty for a single un
-const int beta3_pen[] =   {0,    0,   10,   10,   10,   10,    0};
+const int beta1_pen[] =   {0,    0,  960, 1260, 1460, 1760,    0};  // simple pk penalty
+const int beta1mp_pen[] = {0,    0, 1500, 1800, 2000, 2300,    0};  // pk in a multiloop
+const int beta2_pen[] =   {0,    0,   10,   10,   10,   10,    0};  // penalty for each bpair forming a pknot
+const int beta3_pen[] =   {0,    0,   10,   10,   10,   10,    0};  // penalty for a nucleotide not paired
 
 short *make_pair_table_PK(const char *str);
 std::string pt_to_str_pk(const short *str);
@@ -83,6 +83,11 @@ public:
   // energy:
   int energy;
 
+private:
+  int undo_l;
+  int undo_r;
+  int undo_en;
+
 public:
   // constructor
   Structure(const char *seq, short *structure, short *s0, short *s1);
@@ -109,12 +114,15 @@ private:
   // is the bpair viable?
   INS_FLAG ViableInsert(int left, int right, bool insert = false);
   INS_FLAG Insert(int left, int right);
+  INS_FLAG Shift(int left, int right);
   bool Delete(int left);
 public:
   // do a move
   int MakeMove(const char *seq, short *s0, short *s1, int left, int right);
+  int UndoMove();
 
   INS_FLAG CanInsert(int left, int right);
+  INS_FLAG CanShift(int left, int right);
 };
 
 class Helpers {
@@ -125,6 +133,10 @@ public:
   std::vector<int> str_toleft;
   int last_open;
 
+  int beta2;
+  int beta3;
+  int beta1;
+
   void Create(int length);
   Helpers(int length);
 };
@@ -134,5 +146,7 @@ int energy_of_struct_pk(const char *seq, short *structure, int verbose = 0);
 int energy_of_struct_pk(const char *seq, short *structure, short *s0, short *s1, int verbose = 0);
 void freeP(); // cleanup - run after last call of energy_of_struct - not necessary
 
+
+void try_pk();
 
 #endif
