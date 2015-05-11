@@ -1,6 +1,6 @@
 #ViennaRNA package location
-ViennaRNA=~/software/ViennaRNA-2.1.1/H
-ViennaLIB=~/software/ViennaRNA-2.1.1/lib/libRNA.a
+ViennaRNA=~/software/ViennaRNA-2.1.8/H
+ViennaLIB=~/software/ViennaRNA-2.1.8/lib/libRNA.a
 
 CPP = g++
 CC = gcc
