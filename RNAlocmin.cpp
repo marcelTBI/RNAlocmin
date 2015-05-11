@@ -55,19 +55,19 @@ int find_lone_pair(string &str)
 // if the structure has lone pairs
 int find_lone_pair(short* str)
 {
-  for(int i=1; i<str[0]; i++) {
+  for(int i=1; i<=str[0]; i++) {
     if (str[i]==0) continue; // '.'
 
     if (str[i]>str[str[i]]) {  // '('
-      if (i+1==str[0] || str[i+1]==0 || str[i+1]<str[str[i+1]]) {
+      if (i+1>str[0] || str[i+1]==0 || str[i+1]<str[str[i+1]]) {
         return i;
-      } else while (i+1!=str[0] && str[i+1]!=0 && str[i+1]>str[str[i+1]]) i++;
+      } else while (i+1<=str[0] && str[i+1]!=0 && str[i+1]>str[str[i+1]]) i++;
     }
 
     if (str[i]<str[str[i]]) {  // ')'
-      if (i+1==str[0] || str[i+1]==0 || str[i+1]>str[str[i+1]]) {
+      if (i+1>str[0] || str[i+1]==0 || str[i+1]>str[str[i+1]]) {
         return i;
-      } else while (i+1!=str[0] && str[i+1]!=0 && str[i+1]<str[str[i+1]]) i++;
+      } else while (i+1<=str[0] && str[i+1]!=0 && str[i+1]<str[str[i+1]]) i++;
     }
   }
 
