@@ -7,7 +7,7 @@
 
 extern "C" {
   #include "utils.h"
-  #include "move_set.h"
+  #include "move_set_inside.h"
 }
 
 #include "pknots.h"

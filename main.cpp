@@ -19,7 +19,7 @@ extern "C" {
   #include "read_epars.h"
   #include "fold_vars.h"
   #include "params.h"
-  #include "move_set.h"
+  #include "move_set_inside.h"
 }
 
 #include "findpath_pk.h"

@@ -65,7 +65,6 @@ void print_stats(unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &struc
 
   fprintf(stderr, "Mean  : %.3f (Entrpy: %.3f)\n", mean, entropy);
 }
-//#include "move_set.h"
 
 void add_stats(unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs, map<struct_en, int, comps_entries> &output)
 {

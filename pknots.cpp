@@ -13,7 +13,7 @@ extern "C" {
   #include "fold.h"
   #include "loop_energies.h"
 
-  #include "move_set.h"
+  #include "move_set_inside.h"
 }
 
 #include "pknots.h"
