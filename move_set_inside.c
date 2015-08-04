@@ -83,7 +83,8 @@ PRIVATE int     compare(short *lhs, short *rhs);
 PRIVATE int     find_min(short *arr[MAX_DEGEN], int begin, int end);
 PRIVATE int     equals(const short *first, const short *second);
 PRIVATE int     count_move(void);
-PRIVATE int     lone_base(short *pt, int i);
+PRIVATE int     lone_base(short *pt, int i, int j);
+PRIVATE int     exists_base(short *pt, int i, int j);
 PRIVATE int     check_insert(struct_en *str, int i, int j);
 PRIVATE void    free_degen(Encoded *Enc);
 PRIVATE inline void do_move(short *pt, int bp_left, int bp_right);
@@ -307,6 +308,8 @@ deletions(Encoded *Enc, struct_en *str, struct_en *minim){
   int len = pt[0];
   int i;
 
+  if (Enc->verbose_lvl>1) { fprintf(stderr, "  "); print_str(stderr, str->structure); fprintf(stderr, " %5d Deletions:\n", str->energy); }
+
   for (i=1; i<=len; i++) {
     if (pt[i]>pt[pt[i]]) {  /* '('*/
       Enc->bp_left=-i;
@@ -314,34 +317,34 @@ deletions(Encoded *Enc, struct_en *str, struct_en *minim){
 
       /*if nolp enabled, make (maybe) 2nd delete*/
       if (Enc->noLP) {
-        int lone = -1;
-        if (lone_base(pt, i-1)) lone=i-1;
-        else if (lone_base(pt, i+1)) lone=i+1;
-        else if (lone_base(pt, pt[i]-1)) lone=pt[i]-1;
-        else if (lone_base(pt, pt[i]+1)) lone=pt[i]+1;
+        /* is there a pair around? */
+        bool inside_pair = exists_base(pt, i+1, pt[i]-1);
+        bool outside_pair = exists_base(pt, i-1, pt[i]+1);
 
-        /* check*/
-        if (lone != -1 && (pt[lone]==0 || pt[pt[lone]]==0)) {
-          fprintf(stderr, "WARNING: pt[%d(or %d)]!=\'.\'", lone, pt[lone]);
+        /* we would destroy 1/2 bpairs from inside a stack*/
+        if (inside_pair && outside_pair) continue;
+
+        /* check if we are in noLP space */
+        if (!inside_pair && !outside_pair) {
+          fprintf(stderr, "WRONG!!!! %d %d\n", i, pt[i]);
         }
 
-        if (lone != -1) {
-          Enc->bp_left2=-lone;
-          Enc->bp_right2=-pt[lone];
-
-          // cascading deletes? for example deleting [] from ((..(([....])...))) will delete  next () and that next ()... now disabled, but detecting.
-          if (lone_base(pt, pt[lone]-1) || !lone_base(pt, pt[lone]+1)) {
-            fprintf(stderr, "WARNING: cascading deletes possible detected, currently not deleting, structures with LP can remain! %s at pos %d\n", pt, lone);
+        /* and make a delete or double delete if necessary, double delete do only from one side*/
+        if (inside_pair) {
+          if (!exists_base(pt, i+2, pt[i]-2)) {
+            Enc->bp_left2=-(i+1);
+            Enc->bp_right2=-(pt[i]-1);
           }
-          cnt += update_deepest(Enc, str, minim);
-            /* in case useFirst is on and structure is found, end*/
-          if (Enc->first && cnt > 0) return cnt;
+        } else if (outside_pair) {
+          if (!exists_base(pt, i-2, pt[i]+2)) {
+            continue;
+          }
         }
-      } else {  /* nolp not enabled*/
-        cnt += update_deepest(Enc, str, minim);
-        /* in case useFirst is on and structure is found, end*/
-        if (Enc->first && cnt > 0) return cnt;
       }
+      /* finally the delete */
+      cnt += update_deepest(Enc, str, minim);
+      /* in case useFirst is on and structure is found, end*/
+      if (Enc->first && cnt > 0) return cnt;
     }
   }
   return cnt;
@@ -389,6 +392,8 @@ insertions(Encoded *Enc, struct_en *str, struct_en *minim){
   int len = pt[0];
   int i,j;
 
+  if (Enc->verbose_lvl>1) { fprintf(stderr, "  "); print_str(stderr, str->structure); fprintf(stderr, " %5d Insertions:\n", str->energy); }
+
   for (i=1; i<=len; i++) {
     if (pt[i]==0) {
       for (j=i+1; j<=len; j++) {
@@ -405,32 +410,22 @@ insertions(Encoded *Enc, struct_en *str, struct_en *minim){
 
           if (Enc->noLP) {
             /* if lone bases occur, try inserting one another base*/
-            if (lone_base(pt, i) || lone_base(pt, j)) {
-              /* inside*/
+            if (lone_base(pt, i, j)) {
+              /* try only inside insert -- not to repeat structures*/
               if (try_insert(pt, Enc->seq, i+1, j-1)) {
+                /* but now, check if this second insert does not extend the stem */
+                if (pt[i+2] != 0 && pt[i+2] == pt[j-2]) continue;
+
                 Enc->bp_left2=i+1;
                 Enc->bp_right2=j-1;
-                cnt += update_deepest(Enc, str, minim);
-                /* in case useFirst is on and structure is found, end*/
-                if (Enc->first && cnt > 0) return cnt;
-              } else  /*outside*/
-              if (try_insert(pt, Enc->seq, i-1, j+1)) {
-                Enc->bp_left2=i-1;
-                Enc->bp_right2=j+1;
-                cnt += update_deepest(Enc, str, minim);
-                /* in case useFirst is on and structure is found, end*/
-                if (Enc->first && cnt > 0) return cnt;
-              }
-            } else {
-              cnt += update_deepest(Enc, str, minim);
-              /* in case useFirst is on and structure is found, end*/
-              if (Enc->first && cnt > 0) return cnt;
+              } else continue;
             }
-          } else {
-            cnt += update_deepest(Enc, str, minim);
-            /* in case useFirst is on and structure is found, end*/
-            if (Enc->first && cnt > 0) return cnt;
           }
+
+          // finally insert:
+          cnt += update_deepest(Enc, str, minim);
+          /* in case useFirst is on and structure is found, end*/
+          if (Enc->first && cnt > 0) return cnt;
         }
       }
     }
@@ -740,24 +735,20 @@ move_rset(Encoded *Enc, struct_en *str){
 }
 
 /*check if base is lone*/
+PRIVATE int exists_base(short *pt, int i, int j)
+{
+  if (i<=0 || j<=0 || i>pt[0] || j>pt[0]) return 0;
+
+  return pt[i]!=0 && pt[i] == j;
+}
+
 PRIVATE int
-lone_base(short *pt, int i){
+lone_base(short *pt, int i, int j){
 
-  if (i<=0 || i>pt[0]) return 0;
-  /* is not a base pair*/
-  if (pt[i]==0) return 0;
+  if (i<=0 || i>pt[0] || j<=0 || j>pt[0]) return 0;
 
-  /* base is lone:*/
-  if (i-1>0) {
-    /* is base pair and is the same bracket*/
-    if (pt[i-1]!=0 && ((pt[i-1]<pt[pt[i-1]]) == (pt[i]<pt[pt[i]]))) return 0;
-  }
-
-  if (i+1<=pt[0]) {
-    if (pt[i+1]!=0 && ((pt[i-1]<pt[pt[i-1]]) == (pt[i]<pt[pt[i]]))) return 0;
-  }
-
-  return 1;
+  /* base is lone if there is not a base pair that extends the stack*/
+  return !exists_base(pt, i-1, j+1) && !exists_base(pt, i+1, j-1);
 }
 
 PUBLIC int
