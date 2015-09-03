@@ -10,6 +10,7 @@ struct Neigh
   int energy_change; // = INTMAX unless evaluated
 
   Neigh(int i, int j, int energy = INT_MAX);
+  Neigh();
 };
 
 struct Loop
@@ -64,9 +65,12 @@ public:
     return i==pt[0];
   }
 
+  bool const operator<(const Neighborhood &second) const;
+
   // move the neighbourhood:
   int AddBase(int i, int j, bool reeval = true);
   int RemBase(int i, int j, bool reeval = true);
+  int ApplyNeigh(Neigh &neigh, bool reeval = true);
 
   int RemEnergy(short *pt, int loop, int last_loop = -1);
 
@@ -87,6 +91,7 @@ public:
 
   // degeneracy:
   bool AddDegen(Neigh &neigh, bool lower);
+  void ClearDegen();
 };
 
 void test();

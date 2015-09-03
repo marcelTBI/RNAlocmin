@@ -28,6 +28,10 @@ Neigh::Neigh(int i, int j, int energy)
   energy_change = energy;
 }
 
+Neigh::Neigh():Neigh(-1,-1)
+{
+}
+
 Loop::Loop(int i, int j)
 {
   this->left = i;
@@ -225,6 +229,12 @@ int Neighborhood::RemBase(int i, int j, bool reeval)
   return size;
 }
 
+int Neighborhood::ApplyNeigh(Neigh &neigh, bool reeval)
+{
+  if (neigh.i>0) return AddBase(neigh.i, neigh.j, reeval);
+  else return RemBase(-neigh.i, -neigh.j, reeval);
+}
+
 int Neighborhood::PrintNeighs()
 {
   int res = 0;
@@ -296,43 +306,46 @@ int Neighborhood::RemEnergy(short *pt, int loop, int last_loop)
 int Neighborhood::MoveLowest(bool reeval)
 {
   int lowest = 0;
-  Loop *last_loop = loops[0];
-  for (int i=0; i<(int)loops.size(); i++) {
-    if (loops[i]) {
-      // first inserts:
-      for (int j=0; j<(int)loops[i]->neighs.size(); j++) {
-        if (loops[i]->neighs[j].energy_change<=lowest) {
-          AddDegen(loops[i]->neighs[j], loops[i]->neighs[j].energy_change<lowest);
-          lowest = loops[i]->neighs[j].energy_change;
-        }
-      }
-      // then deletes:
-      if (i != 0) {
-        int change = RemEnergy(pt, i, last_loop->left);
-        if (change <= lowest) {
-          Neigh tmp(-i, -loops[i]->right, change);
-          AddDegen(tmp, change < lowest);
-          lowest = change;
-        }
-      }
-
-      // last loop
-      last_loop = loops[i];
+  StartEnumerating();
+  Neigh next;
+  Neigh lowest_n;
+  while (NextNeighbor(next, true)) {
+    if (next.energy_change == lowest) {
+      AddDegen(next);
+    }
+    if (next.energy_change < lowest) {
+      ClearDegen();
+      lowest = next.energy_change;
+      lowest_n = next;
     }
   }
 
   // resolve degeneracy
   if (degen_todo.size() > 0) {
+    degen_done.push_back(*this);
+    for (int i=0; i<(int)degen_todo.size(); i++) {
+      int degen_en = degen_todo[i].MoveLowest(reeval);
+      if (degen_en < lowest) {
+        *this = degen_todo[i];
+        ClearDegen();
+        return degen_en;
+      }
+    }
 
+  if (degen_done.size() > 0) {
+    // chose the lowest one lexicographically:
+    Neighborhood &res = degen_done[i];
+    for (int i=1; i<(int)degen_done.size(); i++) {
+      if (degen_done[i] < res) res = degen_done[i];
+    }
+    *this = res;
+    ClearDegen();
+    return degen_en;
   }
 
   // apply it:
   if (lowest < 0) {
-    if (lowNs[0].i < 0) {
-      RemBase(-degen[0].i, -lowNs[0].j, true);
-    } else {
-      AddBase(degen[0].i, lowNs[0].j, true);
-    }
+    ApplyNeigh(lowest_n);
   }
 
   return lowest;
@@ -375,9 +388,38 @@ bool Neighborhood::NextNeighbor(Neigh &res, bool with_energy)
   return true;
 }
 
-bool Neighborhood::AddDegen(Neigh &neigh, bool lower)
+void Neighborhood::ClearDegen()
 {
-  return false;
+  degen_done.clear();
+  degen_todo.clear();
+}
+
+bool Neighborhood::AddDegen(Neigh &neigh)
+{
+  int res = false;
+
+  // check if already there:
+  ApplyNeigh(neigh);
+  for (int i=0; i<(int)degen_todo.size(); i++) {
+    if (degen_todo[i] == *this) {
+      res = true;
+      break;
+    }
+  }
+  if (!res) {
+    for (int i=0; i<(int)degen_done.size(); i++) {
+      if (degen_done[i] == *this) {
+        res = true;
+        break;
+      }
+    }
+  }
+  if (!res)  {
+    degen_todo.push_back(*this);
+  }
+  ApplyNeigh(Neigh(-neigh.i; -neigh.j));
+
+  return res;
 }
 
 extern "C" {
