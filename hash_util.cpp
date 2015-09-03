@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include "hash_util.h"
 
+using namespace std;
+
 // does not depend on number - just on dot-bracket notation:
 bool compf_short (const short *lhs, const short *rhs) {
   int i=1;

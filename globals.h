@@ -4,8 +4,6 @@
 #include <set>
 #include <vector>
 
-using namespace std;
-
 extern "C" {
   #include "RNAlocmin_cmdline.h"
 }
@@ -15,7 +13,6 @@ extern "C" {
 // some global counters
 static int num_moves = 0;
 static int seq_len;
-
 
 // structure for sequence related stuff:
 

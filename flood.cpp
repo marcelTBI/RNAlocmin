@@ -12,6 +12,8 @@ extern "C" {
 #include "flood.h"
 #include "RNAlocmin.h"
 
+using namespace std;
+
 // global priority queue for stuff in flooding (does not hold memory - memory is in hash)
 priority_queue<struct_en*, vector<struct_en*>, comps_entries_rev> neighs;
 priority_queue<Structure*, vector<Structure*>, comps_entries_rev> neighs2;

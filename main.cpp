@@ -30,6 +30,7 @@ extern "C" {
 #include "flood.h"
 #include "RNAlocmin.h"
 #include "move_set_pk.h"
+#include "neighbourhood.h"
 
 #include "barrier_tree.h"
 
@@ -109,6 +110,10 @@ char *read_barr(char *previous, map<struct_en, barr_info, comps_entries> &output
 int main(int argc, char **argv)
 {
   clock_t clck1 = clock();
+
+  // testing
+  test();
+  exit(EXIT_SUCCESS);
 
   // parse arguments
   gengetopt_args_info args_info;

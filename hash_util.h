@@ -12,8 +12,6 @@ extern "C" {
 
 #include "pknots.h"
 
-using namespace std;
-
 // help struct for hash
 struct gw_struct {
   int count;
@@ -289,16 +287,16 @@ struct comps_entries_rev {
 };
 
 // print stats about hash
-void print_stats(unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs);
+void print_stats(std::unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs);
 // add stats from hash to output map
-void add_stats(unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs, map<struct_en, int, comps_entries> &output);
+void add_stats(std::unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs, std::map<struct_en, int, comps_entries> &output);
 
 
 // free hash
-void free_hash(unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs);
+void free_hash(std::unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs);
 //void free_hash(unordered_map<Structure, gw_struct, hash_fncts, hash_eq> &structs);
-void free_hash(unordered_set<struct_en*, hash_fncts, hash_eq> &structs);
-void free_hash(unordered_set<Structure*, hash_fncts, hash_eq> &structs);
+void free_hash(std::unordered_set<struct_en*, hash_fncts, hash_eq> &structs);
+void free_hash(std::unordered_set<Structure*, hash_fncts, hash_eq> &structs);
 
 // entry handling
 struct_en *copy_entry(const struct_en *he);

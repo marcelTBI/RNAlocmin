@@ -1,6 +1,8 @@
 #ifndef __MOVE_SET_H
 #define __MOVE_SET_H
 
+#include <stdio.h>
+
 /* used data structure*/
 typedef struct _struct_en{
   int energy;        /* energy in 10kcal/mol*/

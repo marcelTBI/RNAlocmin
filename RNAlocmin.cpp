@@ -16,6 +16,8 @@ extern "C" {
 #include "RNAlocmin.h"
 #include "move_set_pk.h"
 
+using namespace std;
+
 // reads a line no matter how long
 char* my_getline(FILE *fp)
 {
