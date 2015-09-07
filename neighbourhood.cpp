@@ -154,24 +154,40 @@ Neighborhood::Neighborhood(char *seq_in, short *pt)
 
 Neighborhood::Neighborhood(const Neighborhood &second)
 {
+  pt = NULL;
+  HardCopy(second);
+}
+
+Neighborhood::~Neighborhood()
+{
+  Free();
+}
+
+void Neighborhood::Free()
+{
+  if (debug && pt) fprintf(stderr, "Free     %s %6.2f\n", pt_to_str(pt).c_str(), energy/100.0);
+
+  if (pt) free(pt);
+  for (int i=0; i<(int)loops.size(); i++) {
+    if (loops[i]) {
+      delete loops[i];
+    }
+  }
+}
+
+void Neighborhood::HardCopy(const Neighborhood &second)
+{
+  Free();
   this->pt = allocopy(second.pt);
   this->energy = second.energy;
   this->loopnum = second.loopnum;
   this->neighnum = second.neighnum;
 
+  if (debug) fprintf(stderr, "HardCopy %s %6.2f\n", pt_to_str(pt).c_str(), energy/100.0);
+
   loops.resize(second.loops.size(), NULL);
   for (int i=0; i<(int)second.loops.size(); i++) {
     if (second.loops[i]) loops[i] = new Loop(*second.loops[i]);
-  }
-}
-
-Neighborhood::~Neighborhood()
-{
-  free(pt);
-  for (int i=0; i<(int)loops.size(); i++) {
-    if (loops[i]) {
-      delete loops[i];
-    }
   }
 }
 
@@ -355,20 +371,21 @@ int Neighborhood::MoveLowest(bool reeval)
   int lowest = 0;
 
   // debug:
-  if (debug) fprintf(stderr, "MoveLowest: %s %6.2f\n", pt_to_str(pt).c_str(), energy/100.0);
+  if (debug) fprintf(stderr, "MoveLows %s %6.2f\n", pt_to_str(pt).c_str(), energy/100.0);
 
   StartEnumerating();
   Neigh next;
   Neigh lowest_n;
   while (NextNeighbor(next, true)) {
     if (next.energy_change == lowest) {
+      if (debug) fprintf(stderr, "FndLower %s %6.2f\n", GetPT(next).c_str(), (next.energy_change+energy)/100.0);
       if (degen_todo.size() == 0 && degen_done.size() == 0) {
         AddDegen(lowest_n);
       }
       AddDegen(next);
     }
     if (next.energy_change < lowest) {
-      if (debug) fprintf(stderr, "Found lower: %s %6.2f\n", GetPT(next).c_str(), (next.energy_change+energy)/100.0);
+      if (debug) fprintf(stderr, "FndLower %s %6.2f\n", GetPT(next).c_str(), (next.energy_change+energy)/100.0);
       ClearDegen();
       lowest = next.energy_change;
       lowest_n = next;
@@ -377,17 +394,19 @@ int Neighborhood::MoveLowest(bool reeval)
 
   // resolve degeneracy
   if (degen_todo.size() > 0) {
-    degen_done.push_back(*this); // copy constructor - OK
-    for (int i=0; i<(int)degen_todo.size(); i++) {
-      Neighborhood todo(degen_todo[i]); /// TODO can be better (erase)
-      degen_todo.erase(i);
-      int degen_en = todo.MoveLowest(reeval);
+    degen_done.push_back(*this); // copy constructor - OK  ///TODO only if energies match
+    Neighborhood todo(degen_todo[0]);
+    degen_todo.erase(degen_todo.begin());
+    int degen_en = todo.MoveLowest(reeval);
+    if (degen_en < 0) {
+      HardCopy(todo);
+      return degen_en+lowest;
+    }
       /*if (degen_en < lowest) {
         *this = degen_todo[i]; // not copy constructor
         ClearDegen();
         return degen_en;
       }*/
-    }
   }
 
   // now chose the lowest one:
@@ -397,13 +416,14 @@ int Neighborhood::MoveLowest(bool reeval)
     for (int i=1; i<(int)degen_done.size(); i++) {
       if (degen_done[i] < res) res = degen_done[i];
     }
+
     int diff_en = energy - res.energy;
-    *this = res; // not good
+    HardCopy(res);
     ClearDegen();
     return diff_en;
   }
 
-  // apply it:
+  // apply it: (in case of no degeneracy)
   if (lowest < 0) {
     ApplyNeigh(lowest_n);
   }
@@ -450,10 +470,11 @@ bool Neighborhood::NextNeighbor(Neigh &res, bool with_energy)
 
 void Neighborhood::ClearDegen()
 {
+  // debug:
+  if (debug && (degen_done.size() + degen_todo.size() > 0)) fprintf(stderr, "ClrDegen (%d, %d)\n", degen_todo.size(), degen_done.size());
+
   degen_done.clear();
   degen_todo.clear();
-  // debug:
-  if (debug) fprintf(stderr, "ClearDegen\n");
 }
 
 bool Neighborhood::AddDegen(Neigh &neigh)
@@ -464,10 +485,10 @@ bool Neighborhood::AddDegen(Neigh &neigh)
   ApplyNeigh(neigh);
 
   // debug:
-  if (debug) fprintf(stderr, "AddDegen: %s %6.2f\n", pt_to_str(pt).c_str(), energy/100.0);
+  if (debug) fprintf(stderr, "AddDegen %s %6.2f\n", pt_to_str(pt).c_str(), energy/100.0);
 
   // check:
-  if (energy_cur != energy) {
+  if (0 && energy_cur != energy) {
     fprintf(stderr, "WARNING: energies do not match in AddDegen (%d != %d)\n", energy_cur, energy);
   }
 

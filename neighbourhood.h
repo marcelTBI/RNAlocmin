@@ -59,6 +59,9 @@ public:
   Neighborhood(const Neighborhood &second);
   ~Neighborhood();
 
+  void Free();
+  void HardCopy(const Neighborhood &second);
+
   bool const operator==(const Neighborhood &second) const {
     int i=0;
     while (i<pt[0] && pt[i]==second.pt[i]) i++;
