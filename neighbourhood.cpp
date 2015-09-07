@@ -5,6 +5,7 @@
 
 #include "neighbourhood.h"
 #include "RNAlocmin.h"
+#include "hash_util.h"
 
 extern "C" {
   #include "move_set_inside.h"
@@ -13,6 +14,17 @@ extern "C" {
 }
 
 #define MINGAP 3
+
+// declare static members:
+char *Neighborhood::seq = NULL;
+short *Neighborhood::s0 = NULL;
+short *Neighborhood::s1 = NULL;
+bool Neighborhood::debug = true;
+
+// for degeneracy:
+int Neighborhood::energy_cur = 0;
+std::vector<Neighborhood> Neighborhood::degen_todo;
+std::vector<Neighborhood> Neighborhood::degen_done;
 
 void error_message(char *str, int i = -1, int j = -1, int k = -1, int l = -1)
 {
@@ -64,8 +76,8 @@ compat(char a, char b){
 
 int Loop::GenNeighs(char *seq, short *pt)
 {
-  int res = -1;
   neighs.clear();
+  int res = -1;
 
   for (int i=left+1; i<right; i++) {
     if (pt[i]>i) {   // '('
@@ -104,11 +116,11 @@ int Loop::EvalLoop(short *pt, short *s0, short *s1, bool inside)
   return energy;
 }
 
-Neighborhood::Neighborhood(char *seq, short *pt)
+Neighborhood::Neighborhood(char *seq_in, short *pt)
 {
   this->pt = allocopy(pt);
-  this->seq = (char*)malloc((strlen(seq)+1)*sizeof(char));
-  strcpy(this->seq, seq);
+  seq = (char*)malloc((strlen(seq_in)+1)*sizeof(char));
+  strcpy(seq, seq_in);
 
   make_pair_matrix();
   update_fold_params();
@@ -140,10 +152,9 @@ Neighborhood::Neighborhood(char *seq, short *pt)
   }
 }
 
-Neighborhood::Neighborhood(Neighborhood &second)
+Neighborhood::Neighborhood(const Neighborhood &second)
 {
   this->pt = allocopy(second.pt);
-
   this->energy = second.energy;
   this->loopnum = second.loopnum;
   this->neighnum = second.neighnum;
@@ -152,20 +163,30 @@ Neighborhood::Neighborhood(Neighborhood &second)
   for (int i=0; i<(int)second.loops.size(); i++) {
     if (second.loops[i]) loops[i] = new Loop(*second.loops[i]);
   }
-
 }
 
 Neighborhood::~Neighborhood()
 {
   free(pt);
-  free(seq);
-  if (s0) free(s0);
-  if (s1) free(s1);
   for (int i=0; i<(int)loops.size(); i++) {
     if (loops[i]) {
       delete loops[i];
     }
   }
+}
+
+void Neighborhood::ClearStatic()
+{
+  if (seq) { free(seq); seq = NULL; }
+  if (s0) { free(s0); s0 = NULL; }
+  if (s1) { free(s1); s1 = NULL; }
+  ClearDegen();
+}
+
+bool const Neighborhood::operator<(const Neighborhood &second) const
+{
+  if (second.energy != energy) return energy<second.energy;
+  else return compf_short(pt, second.pt);
 }
 
 inline int find_enclosing(short *pt, int i)
@@ -190,16 +211,21 @@ int Neighborhood::AddBase(int i, int j, bool reeval)
   Loop* newloop = new Loop(i,j);
   if (loops[i]) error_message("Loop %3d already set!!!", i);
   loops[i] = newloop;
-
   newloop->GenNeighs(seq, pt);
   pt[i] = j;
   pt[j] = i;
-  if (reeval) newloop->EvalLoop(pt, s0, s1, true);
+  int energy_chng = 0;
+  if (reeval) energy_chng += newloop->EvalLoop(pt, s0, s1, true);
 
   // delete the neighbors that are wrong now (can be better)
+  if (reeval) energy_chng -= loops[beg]->energy;
   loops[beg]->GenNeighs(seq, pt);
-  if (reeval) loops[beg]->EvalLoop(pt, s0, s1, true);
+  if (reeval) energy_chng += loops[beg]->EvalLoop(pt, s0, s1, true);
 
+  // update energy
+  energy += energy_chng;
+
+  // calculate size
   size += loops[i]->neighs.size() + loops[beg]->neighs.size();
 
   return size;
@@ -216,15 +242,21 @@ int Neighborhood::RemBase(int i, int j, bool reeval)
   int size = -loops[upper]->neighs.size() - loops[i]->neighs.size();
 
   // delete this one
+  int energy_chng = 0;
+  if (reeval) energy_chng -= loops[i]->energy;
   delete loops[i];
   loops[i] = NULL;
   pt[i] = 0;
   pt[j] = 0;
 
   // recompute the upper one:
+  if (reeval) energy_chng -= loops[upper]->energy;
   loops[upper]->GenNeighs(seq, pt);
-  if (reeval) loops[upper]->EvalLoop(pt, s0, s1, true);
+  if (reeval) energy_chng += loops[upper]->EvalLoop(pt, s0, s1, true);
   size += loops[upper]->neighs.size();
+
+  // energy assign
+  energy += energy_chng;
 
   return size;
 }
@@ -258,6 +290,7 @@ int Neighborhood::PrintEnum()
   StartEnumerating();
   while (NextNeighbor(tmp, true)) {
     fprintf(stdout, "  %3d %3d %5d\n", tmp.i, tmp.j, tmp.energy_change);
+    res++;
   }
   return res;
 }
@@ -275,12 +308,6 @@ int Neighborhood::EvalNeighs(bool full)
   }
 
   return energy;
-}
-
-void addToLowest(std::vector<Neigh> &low, Neigh &lowest, bool clear)
-{
-  if (clear) low.clear();
-  low.push_back(lowest);
 }
 
 int Neighborhood::RemEnergy(short *pt, int loop, int last_loop)
@@ -303,17 +330,45 @@ int Neighborhood::RemEnergy(short *pt, int loop, int last_loop)
   return change;
 }
 
+std::string Neighborhood::GetPT(Neigh &next)
+{
+  std::string ret;
+  // delete:
+  if (next.i<0) {
+    pt[-next.i] = 0;
+    pt[-next.j] = 0;
+    ret = pt_to_str(pt);
+    pt[-next.i] = -next.j;
+    pt[-next.j] = -next.i;
+  } else { // insert
+    pt[next.i] = next.j;
+    pt[next.j] = next.i;
+    ret = pt_to_str(pt);
+    pt[next.i] = 0;
+    pt[next.j] = 0;
+  }
+  return ret;
+}
+
 int Neighborhood::MoveLowest(bool reeval)
 {
   int lowest = 0;
+
+  // debug:
+  if (debug) fprintf(stderr, "MoveLowest: %s %6.2f\n", pt_to_str(pt).c_str(), energy/100.0);
+
   StartEnumerating();
   Neigh next;
   Neigh lowest_n;
   while (NextNeighbor(next, true)) {
     if (next.energy_change == lowest) {
+      if (degen_todo.size() == 0 && degen_done.size() == 0) {
+        AddDegen(lowest_n);
+      }
       AddDegen(next);
     }
     if (next.energy_change < lowest) {
+      if (debug) fprintf(stderr, "Found lower: %s %6.2f\n", GetPT(next).c_str(), (next.energy_change+energy)/100.0);
       ClearDegen();
       lowest = next.energy_change;
       lowest_n = next;
@@ -322,25 +377,30 @@ int Neighborhood::MoveLowest(bool reeval)
 
   // resolve degeneracy
   if (degen_todo.size() > 0) {
-    degen_done.push_back(*this);
+    degen_done.push_back(*this); // copy constructor - OK
     for (int i=0; i<(int)degen_todo.size(); i++) {
-      int degen_en = degen_todo[i].MoveLowest(reeval);
-      if (degen_en < lowest) {
-        *this = degen_todo[i];
+      Neighborhood todo(degen_todo[i]); /// TODO can be better (erase)
+      degen_todo.erase(i);
+      int degen_en = todo.MoveLowest(reeval);
+      /*if (degen_en < lowest) {
+        *this = degen_todo[i]; // not copy constructor
         ClearDegen();
         return degen_en;
-      }
+      }*/
     }
+  }
 
+  // now chose the lowest one:
   if (degen_done.size() > 0) {
     // chose the lowest one lexicographically:
-    Neighborhood &res = degen_done[i];
+    Neighborhood &res = degen_done[0];
     for (int i=1; i<(int)degen_done.size(); i++) {
       if (degen_done[i] < res) res = degen_done[i];
     }
-    *this = res;
+    int diff_en = energy - res.energy;
+    *this = res; // not good
     ClearDegen();
-    return degen_en;
+    return diff_en;
   }
 
   // apply it:
@@ -392,6 +452,8 @@ void Neighborhood::ClearDegen()
 {
   degen_done.clear();
   degen_todo.clear();
+  // debug:
+  if (debug) fprintf(stderr, "ClearDegen\n");
 }
 
 bool Neighborhood::AddDegen(Neigh &neigh)
@@ -400,6 +462,16 @@ bool Neighborhood::AddDegen(Neigh &neigh)
 
   // check if already there:
   ApplyNeigh(neigh);
+
+  // debug:
+  if (debug) fprintf(stderr, "AddDegen: %s %6.2f\n", pt_to_str(pt).c_str(), energy/100.0);
+
+  // check:
+  if (energy_cur != energy) {
+    fprintf(stderr, "WARNING: energies do not match in AddDegen (%d != %d)\n", energy_cur, energy);
+  }
+
+  // search him in degen_*
   for (int i=0; i<(int)degen_todo.size(); i++) {
     if (degen_todo[i] == *this) {
       res = true;
@@ -414,12 +486,17 @@ bool Neighborhood::AddDegen(Neigh &neigh)
       }
     }
   }
+
+  // add if not found
   if (!res)  {
     degen_todo.push_back(*this);
   }
-  ApplyNeigh(Neigh(-neigh.i; -neigh.j));
 
-  return res;
+  // return state
+  Neigh to_apply(-neigh.i, -neigh.j, -neigh.energy_change);
+  ApplyNeigh(to_apply);
+
+  return !res;
 }
 
 extern "C" {
@@ -430,21 +507,22 @@ void test()
 {
 //char num[] = "123456789012345678901234567890123456";
   char seq[] = "CCCCCCCCCCCCCCCCCCGGGGGGGGGGGGGGGGGG";
-  char str[] = "....................................";
+  char str[] = "....(((.......(........)......)))...";
   short *pt = make_pair_table(str);
 
   Neighborhood nh(seq, pt);
   nh.EvalNeighs(true);
-  nh.PrintNeighs();
-
-  int size = nh.AddBase(15,25,true);
-  fprintf(stderr, "adding %d %d added %d neighbours\n", 15,25,size);
-  nh.PrintNeighs();
   nh.PrintEnum();
+
+  //int size = nh.AddBase(15,25,true);
+  //fprintf(stderr, "adding %d %d added %d neighbours\n", 15,25,size);
+  //nh.PrintNeighs();
+  //nh.PrintEnum();
   nh.PrintStr();
-  nh.MoveLowest();
+  while (nh.MoveLowest());
   nh.PrintStr();
 
   free(pt);
   free_arrays();
+  Neighborhood::ClearStatic();
 }
