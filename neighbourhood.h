@@ -50,9 +50,9 @@ class Neighborhood
   int neighnum;
 
   // for degeneracy:
-  static int energy_cur;
-  static std::vector<Neighborhood> degen_todo;
-  static std::vector<Neighborhood> degen_done;
+  static int energy_deg;
+  static std::vector<Neighborhood*> degen_todo;
+  static std::vector<Neighborhood*> degen_done;
 
 public:
   Neighborhood(char *seq, short *pt);
@@ -60,6 +60,7 @@ public:
   ~Neighborhood();
 
   void Free();
+  void SoftCopy(const Neighborhood &second, bool free_it = true);
   void HardCopy(const Neighborhood &second);
 
   bool const operator==(const Neighborhood &second) const {

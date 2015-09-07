@@ -22,9 +22,9 @@ short *Neighborhood::s1 = NULL;
 bool Neighborhood::debug = true;
 
 // for degeneracy:
-int Neighborhood::energy_cur = 0;
-std::vector<Neighborhood> Neighborhood::degen_todo;
-std::vector<Neighborhood> Neighborhood::degen_done;
+int Neighborhood::energy_deg = 0;
+std::vector<Neighborhood*> Neighborhood::degen_todo;
+std::vector<Neighborhood*> Neighborhood::degen_done;
 
 void error_message(char *str, int i = -1, int j = -1, int k = -1, int l = -1)
 {
@@ -172,6 +172,23 @@ void Neighborhood::Free()
     if (loops[i]) {
       delete loops[i];
     }
+  }
+}
+
+void Neighborhood::SoftCopy(const Neighborhood &second, bool free_it)
+{
+  if (free_it) Free();
+
+  this->pt = second.pt;
+  this->energy = second.energy;
+  this->loopnum = second.loopnum;
+  this->neighnum = second.neighnum;
+
+  if (debug) fprintf(stderr, "SoftCopy %s %6.2f\n", pt_to_str(pt).c_str(), energy/100.0);
+
+  loops.resize(second.loops.size(), NULL);
+  for (int i=0; i<(int)second.loops.size(); i++) {
+    if (second.loops[i]) loops[i] = second.loops[i];
   }
 }
 
@@ -394,12 +411,15 @@ int Neighborhood::MoveLowest(bool reeval)
 
   // resolve degeneracy
   if (degen_todo.size() > 0) {
-    degen_done.push_back(*this); // copy constructor - OK  ///TODO only if energies match
-    Neighborhood todo(degen_todo[0]);
+    if (energy == energy_deg) degen_done.push_back(new Neighborhood(*this)); // copy constructor - OK  ///TODO only if energies match
+    Neighborhood *todo = degen_todo[0];
     degen_todo.erase(degen_todo.begin());
-    int degen_en = todo.MoveLowest(reeval);
+    int degen_en = todo->MoveLowest(reeval);
     if (degen_en < 0) {
-      HardCopy(todo);
+      //SoftCopy(*todo);
+      HardCopy(*todo);
+      delete todo;
+      //ClearDegen();
       return degen_en+lowest;
     }
       /*if (degen_en < lowest) {
@@ -412,13 +432,13 @@ int Neighborhood::MoveLowest(bool reeval)
   // now chose the lowest one:
   if (degen_done.size() > 0) {
     // chose the lowest one lexicographically:
-    Neighborhood &res = degen_done[0];
+    Neighborhood *res = degen_done[0];
     for (int i=1; i<(int)degen_done.size(); i++) {
-      if (degen_done[i] < res) res = degen_done[i];
+      if (*degen_done[i] < *res) res = degen_done[i];
     }
 
-    int diff_en = energy - res.energy;
-    HardCopy(res);
+    int diff_en = energy - res->energy;
+    HardCopy(*res);
     ClearDegen();
     return diff_en;
   }
@@ -471,7 +491,15 @@ bool Neighborhood::NextNeighbor(Neigh &res, bool with_energy)
 void Neighborhood::ClearDegen()
 {
   // debug:
-  if (debug && (degen_done.size() + degen_todo.size() > 0)) fprintf(stderr, "ClrDegen (%d, %d)\n", degen_todo.size(), degen_done.size());
+  if (debug && (degen_done.size() + degen_todo.size() > 0)) fprintf(stderr, "ClrDegen (%d, %d)\n", (int)degen_todo.size(), (int)degen_done.size());
+
+  for (int i=0; i<(int)degen_done.size(); i++) {
+    delete degen_done[i];
+  }
+
+  for (int i=0; i<(int)degen_todo.size(); i++) {
+    delete degen_todo[i];
+  }
 
   degen_done.clear();
   degen_todo.clear();
@@ -487,21 +515,24 @@ bool Neighborhood::AddDegen(Neigh &neigh)
   // debug:
   if (debug) fprintf(stderr, "AddDegen %s %6.2f\n", pt_to_str(pt).c_str(), energy/100.0);
 
+  // assign energy if first:
+  if (degen_done.size() == 0 && degen_todo.size() == 0) energy_deg = energy;
+
   // check:
-  if (0 && energy_cur != energy) {
-    fprintf(stderr, "WARNING: energies do not match in AddDegen (%d != %d)\n", energy_cur, energy);
+  if (0 && energy_deg != energy) {
+    fprintf(stderr, "WARNING: energies do not match in AddDegen (%d != %d)\n", energy_deg, energy);
   }
 
   // search him in degen_*
   for (int i=0; i<(int)degen_todo.size(); i++) {
-    if (degen_todo[i] == *this) {
+    if (*degen_todo[i] == *this) {
       res = true;
       break;
     }
   }
   if (!res) {
     for (int i=0; i<(int)degen_done.size(); i++) {
-      if (degen_done[i] == *this) {
+      if (*degen_done[i] == *this) {
         res = true;
         break;
       }
@@ -510,7 +541,7 @@ bool Neighborhood::AddDegen(Neigh &neigh)
 
   // add if not found
   if (!res)  {
-    degen_todo.push_back(*this);
+    degen_todo.push_back(new Neighborhood(*this));
   }
 
   // return state
@@ -540,7 +571,7 @@ void test()
   //nh.PrintNeighs();
   //nh.PrintEnum();
   nh.PrintStr();
-  while (nh.MoveLowest());
+  while(nh.MoveLowest());
   nh.PrintStr();
 
   free(pt);
