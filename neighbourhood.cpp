@@ -116,6 +116,13 @@ int Loop::EvalLoop(short *pt, short *s0, short *s1, bool inside)
   return energy;
 }
 
+void debug_loops(std::vector<Loop*> &loops)
+{
+  for (int i=0; i<(int)loops.size(); i++) {
+    if (loops[i] && loops[i]->left != i) fprintf(stderr, "WARNING: loops[i]->left=%d i=%d", loops[i]->left, i);
+  }
+}
+
 Neighborhood::Neighborhood(char *seq_in, short *s0, short *s1, short *pt, bool eval)
 {
   this->pt = allocopy(pt);
@@ -141,16 +148,20 @@ Neighborhood::Neighborhood(char *seq_in, short *s0, short *s1, short *pt, bool e
 
   // generate the neighbourhood (inserts)
   for (; i<pt[0]; i++) {
-    if (pt[i]>i) {
+    if (pt[i] != 0 && pt[i]>i) {
       Loop *newone = new Loop(i, pt[i]);
       loops[i] = newone;
       int k = newone->GenNeighs(seq, pt);
+
+      // jump to next -- either inside or outside
       if (k!=-1) i = k-1;
       else i = pt[i];
     }
   }
 
   if (eval) EvalNeighs(true);
+  StartEnumerating();
+  debug_loops(loops);
 }
 
 Neighborhood::Neighborhood(const Neighborhood &second)
@@ -172,6 +183,7 @@ void Neighborhood::Free()
   for (int i=0; i<(int)loops.size(); i++) {
     if (loops[i]) {
       delete loops[i];
+      loops[i] = NULL;
     }
   }
 }
@@ -184,6 +196,7 @@ void Neighborhood::SoftCopy(const Neighborhood &second, bool free_it)
   this->energy = second.energy;
   this->loopnum = second.loopnum;
   this->neighnum = second.neighnum;
+  this->top_loop = second.top_loop;
 
   if (debug) fprintf(stderr, "SoftCopy %s %6.2f\n", pt_to_str(pt).c_str(), energy/100.0);
 
@@ -200,6 +213,7 @@ void Neighborhood::HardCopy(const Neighborhood &second)
   this->energy = second.energy;
   this->loopnum = second.loopnum;
   this->neighnum = second.neighnum;
+  this->top_loop = second.top_loop;
 
   if (debug) fprintf(stderr, "HardCopy %s %6.2f\n", pt_to_str(pt).c_str(), energy/100.0);
 
@@ -207,6 +221,7 @@ void Neighborhood::HardCopy(const Neighborhood &second)
   for (int i=0; i<(int)second.loops.size(); i++) {
     if (second.loops[i]) loops[i] = new Loop(*second.loops[i]);
   }
+  debug_loops(loops);
 }
 
 void Neighborhood::ClearStatic()
@@ -242,8 +257,8 @@ int Neighborhood::AddBase(int i, int j, bool reeval)
   int size = -loops[beg]->neighs.size();
 
   // insert it + generate new neighbors
-  Loop* newloop = new Loop(i,j);
   if (loops[i]) error_message("Loop %3d already set!!!", i);
+  Loop* newloop = new Loop(i,j);
   loops[i] = newloop;
   newloop->GenNeighs(seq, pt);
   pt[i] = j;
@@ -397,7 +412,7 @@ int Neighborhood::MoveLowest(bool reeval)
   while (NextNeighbor(next, true)) {
     if (next.energy_change == lowest) {
       if (debug) fprintf(stderr, "FndLower %s %6.2f\n", GetPT(next).c_str(), (next.energy_change+energy)/100.0);
-      if (degen_todo.size() == 0 && degen_done.size() == 0) {
+      if (degen_todo.size() == 0 && degen_done.size() == 0 && lowest < 0) {
         AddDegen(lowest_n);
       }
       AddDegen(next);
@@ -455,8 +470,22 @@ int Neighborhood::MoveLowest(bool reeval)
 
 void Neighborhood::StartEnumerating()
 {
+  top_loop = -1;
   loopnum = 0;
-  neighnum = 0;
+  neighnum = -1;
+  IncreaseCount();
+}
+
+void Neighborhood::IncreaseCount()
+{
+  // increase the count
+  neighnum++;
+  if (neighnum >= (int)loops[loopnum]->neighs.size()) {
+    neighnum = -1;
+    top_loop = loopnum;
+    loopnum++;
+    while (loopnum<(int)loops.size() && loops[loopnum]==NULL) loopnum++;
+  }
 }
 
 bool Neighborhood::NextNeighbor(Neigh &res, bool with_energy)
@@ -464,26 +493,17 @@ bool Neighborhood::NextNeighbor(Neigh &res, bool with_energy)
   // first get end:
   if ((int)loops.size() <= loopnum) return false;
 
-  // store last loop:
-  int last_loop = -1;
-
   // deletes and inserts:
   if (neighnum == -1) {
     // deletes
-    res = Neigh(-loops[loopnum]->left, -loops[loopnum]->right, with_energy?RemEnergy(pt, loopnum, last_loop):INT_MAX);
+    res = Neigh(-loops[loopnum]->left, -loops[loopnum]->right, with_energy?RemEnergy(pt, loopnum, top_loop):INT_MAX);
   } else {
     // inserts
     res = loops[loopnum]->neighs[neighnum];
   }
 
-  // increase the count
-  neighnum++;
-  if (neighnum >= (int)loops[loopnum]->neighs.size()) {
-    neighnum = -1;
-    last_loop = loopnum;
-    loopnum++;
-    while (loopnum<(int)loops.size() && loops[loopnum]==NULL) loopnum++;
-  }
+  // increae the enumeration count
+  IncreaseCount();
 
   //if (loop.size() <= loopnum) return false;
   return true;

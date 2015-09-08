@@ -136,8 +136,9 @@ int move_set(struct_en &input, SeqInfo &sqi)
           while (neigh.MoveLowest(true));
           copy_arr(input.structure, neigh.pt);
           input.energy = neigh.energy;
+        } else {
+          input.energy = move_gradient(sqi.seq, input.structure, sqi.s0, sqi.s1, verbose, Opt.shift, Opt.noLP);
         }
-        input.energy = move_gradient(sqi.seq, input.structure, sqi.s0, sqi.s1, verbose, Opt.shift, Opt.noLP);
       }
     }
   }

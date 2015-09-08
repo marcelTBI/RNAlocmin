@@ -46,6 +46,7 @@ private:
   // for enumeration:
   int loopnum;
   int neighnum;
+  int top_loop;
 
   // for degeneracy:
   static int energy_deg;
@@ -93,6 +94,7 @@ public:
 
   // enumerating neighbors:
   void StartEnumerating();
+  void IncreaseCount();
   bool NextNeighbor(Neigh &res, bool with_energy);  // return True if success, False if end of enumerating
 
   // degeneracy:

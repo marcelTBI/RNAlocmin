@@ -546,6 +546,7 @@ int main(int argc, char **argv)
   if (name!=NULL) free(name);
   cmdline_parser_free(&args_info);
   freeP();
+  free_arrays();
 
   // time?
   if (args_info.verbose_lvl_arg>0) {
