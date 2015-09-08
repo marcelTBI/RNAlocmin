@@ -118,6 +118,7 @@ int Options::Init(gengetopt_args_info &args_info)
   verbose_lvl = args_info.verbose_lvl_arg;
   floodMax = args_info.floodMax_arg;
   pknots = args_info.pseudoknots_flag;
+  neighs = args_info.neighborhood_flag;
 
   return ret;
 }

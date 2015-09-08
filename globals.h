@@ -39,6 +39,7 @@ public:
   bool shift;   // use shifts?
   int verbose_lvl; // level of verbosity
   int floodMax; // cap for flooding
+  bool neighs;  // use neighborhood routines?
 
   bool pknots; // flag for pseudoknots.
 

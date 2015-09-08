@@ -15,6 +15,7 @@ extern "C" {
 
 #include "RNAlocmin.h"
 #include "move_set_pk.h"
+#include "neighbourhood.h"
 
 using namespace std;
 
@@ -129,7 +130,15 @@ int move_set(struct_en &input, SeqInfo &sqi)
     if (Opt.rand) input.energy = move_adaptive(sqi.seq, input.structure, sqi.s0, sqi.s1, verbose);
     else {
       if (Opt.first) input.energy = move_first(sqi.seq, input.structure, sqi.s0, sqi.s1, verbose, Opt.shift, Opt.noLP);
-      else input.energy = move_gradient(sqi.seq, input.structure, sqi.s0, sqi.s1, verbose, Opt.shift, Opt.noLP);
+      else {
+        if (Opt.neighs) {
+          Neighborhood neigh(sqi.seq, sqi.s0, sqi.s1, input.structure);
+          while (neigh.MoveLowest(true));
+          copy_arr(input.structure, neigh.pt);
+          input.energy = neigh.energy;
+        }
+        input.energy = move_gradient(sqi.seq, input.structure, sqi.s0, sqi.s1, verbose, Opt.shift, Opt.noLP);
+      }
     }
   }
   return input.energy;

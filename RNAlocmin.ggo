@@ -38,6 +38,7 @@ details="\nWith -d1 only unpaired bases can participate in at most one dangling 
 option "fix-barriers"       - "Fix barrier file for interior loops (just recompute if all LM in barrier output are LM), if specified, does not need neither --previous nor --seq option" string no hidden
 option "pseudoknots"        k "Allow for pseudoknots according to \"gfold\" model - H, K, L, and M types (genus one) of pseudoknots are allowed. (slower)" flag off
 option "just-read"          - "Do not assume further input, just do postprocessing." flag off
+option "neighborhood"       N "Use the Neighborhood routines to perform gradient descend. Test option." flag off
 
 section "Misc"
 option "numIntervals"       - "Number of intervals for Jing's visualisation" int default="0" no hidden

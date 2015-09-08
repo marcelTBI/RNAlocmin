@@ -112,8 +112,8 @@ int main(int argc, char **argv)
   clock_t clck1 = clock();
 
   // testing
-  test();
-  exit(EXIT_SUCCESS);
+  //test();
+  //exit(EXIT_SUCCESS);
 
   // parse arguments
   gengetopt_args_info args_info;
@@ -819,6 +819,7 @@ int move(unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs, map<
   bool struct_found = false;
   bool energy_found = false;
 
+  // read the structure
   p = strtok(line, sep);
   while(p!=NULL && !(struct_found && energy_found)) {
     //fprintf(stderr, "%s\n", p);

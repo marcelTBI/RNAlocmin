@@ -81,7 +81,7 @@ int Loop::GenNeighs(char *seq, short *pt)
 
   for (int i=left+1; i<right; i++) {
     if (pt[i]>i) {   // '('
-      res = i;
+      if (res == -1) res = i;
       i = pt[i];
       continue;
     }
@@ -116,17 +116,16 @@ int Loop::EvalLoop(short *pt, short *s0, short *s1, bool inside)
   return energy;
 }
 
-Neighborhood::Neighborhood(char *seq_in, short *pt)
+Neighborhood::Neighborhood(char *seq_in, short *s0, short *s1, short *pt, bool eval)
 {
   this->pt = allocopy(pt);
+  this->seq = seq_in;
+  /*
   seq = (char*)malloc((strlen(seq_in)+1)*sizeof(char));
-  strcpy(seq, seq_in);
+  strcpy(seq, seq_in);*/
 
-  make_pair_matrix();
-  update_fold_params();
-
-  s0 = encode_sequence(seq, 0);
-  s1 = encode_sequence(seq, 1);
+  this->s0 = s0;
+  this->s1 = s1;
 
   energy = INT_MAX;
 
@@ -150,6 +149,8 @@ Neighborhood::Neighborhood(char *seq_in, short *pt)
       else i = pt[i];
     }
   }
+
+  if (eval) EvalNeighs(true);
 }
 
 Neighborhood::Neighborhood(const Neighborhood &second)
@@ -210,9 +211,9 @@ void Neighborhood::HardCopy(const Neighborhood &second)
 
 void Neighborhood::ClearStatic()
 {
-  if (seq) { free(seq); seq = NULL; }
-  if (s0) { free(s0); s0 = NULL; }
-  if (s1) { free(s1); s1 = NULL; }
+  if (seq) { seq = NULL; }
+  if (s0) { s0 = NULL; }
+  if (s1) { s1 = NULL; }
   ClearDegen();
 }
 
@@ -562,8 +563,14 @@ void test()
   char str[] = "....(((.......(........)......)))...";
   short *pt = make_pair_table(str);
 
-  Neighborhood nh(seq, pt);
-  nh.EvalNeighs(true);
+  make_pair_matrix(); // dunno if needed
+  update_fold_params();
+
+  short *s0 = encode_sequence(seq, 0);
+  short *s1 = encode_sequence(seq, 1);
+
+  Neighborhood nh(seq, s0, s1, pt);
+  //nh.EvalNeighs(true);
   nh.PrintEnum();
 
   //int size = nh.AddBase(15,25,true);
@@ -575,6 +582,8 @@ void test()
   nh.PrintStr();
 
   free(pt);
+  free(s0);
+  free(s1);
   free_arrays();
   Neighborhood::ClearStatic();
 }

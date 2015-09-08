@@ -35,15 +35,13 @@ struct Loop
 
 class Neighborhood
 {
-  short *pt;
+private:
   static char *seq;
   static short *s0;
   static short *s1;
   static bool debug;
 
   std::vector<Loop*> loops;
-
-  int energy; // = INTMAX until not evaluated;
 
   // for enumeration:
   int loopnum;
@@ -55,7 +53,11 @@ class Neighborhood
   static std::vector<Neighborhood*> degen_done;
 
 public:
-  Neighborhood(char *seq, short *pt);
+  short *pt;
+  int energy; // = INTMAX until not evaluated;
+
+public:
+  Neighborhood(char *seq, short *s0, short *s1, short *pt, bool eval = true);
   Neighborhood(const Neighborhood &second);
   ~Neighborhood();
 
@@ -98,7 +100,6 @@ public:
   static void ClearDegen();
 
   static void ClearStatic();
-
 
   // debug
   std::string GetPT(Neigh &next);
