@@ -133,6 +133,7 @@ int move_set(struct_en &input, SeqInfo &sqi)
       else {
         if (Opt.neighs) {
           Neighborhood neigh(sqi.seq, sqi.s0, sqi.s1, input.structure);
+          //neigh.PrintEnum();
           while (neigh.MoveLowest(true));
           copy_arr(input.structure, neigh.pt);
           input.energy = neigh.energy;

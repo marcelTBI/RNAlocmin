@@ -113,6 +113,8 @@ int Loop::EvalLoop(short *pt, short *s0, short *s1, bool inside)
     }
   }
 
+  if (Neighborhood::debug) fprintf(stderr, "EvalLoop %s (%3d, %3d) = %4d\n", pt_to_str(pt).c_str(), left, right, energy);
+
   return energy;
 }
 
@@ -405,20 +407,21 @@ int Neighborhood::MoveLowest(bool reeval)
 
   // debug:
   if (debug) fprintf(stderr, "MoveLows %s %6.2f\n", pt_to_str(pt).c_str(), energy/100.0);
+  if (debug) PrintEnum();
 
   StartEnumerating();
   Neigh next;
   Neigh lowest_n;
   while (NextNeighbor(next, true)) {
     if (next.energy_change == lowest) {
-      if (debug) fprintf(stderr, "FndLower %s %6.2f\n", GetPT(next).c_str(), (next.energy_change+energy)/100.0);
+      if (debug) fprintf(stderr, "FndEqual %s %6.2f (%3d, %3d)\n", GetPT(next).c_str(), (next.energy_change+energy)/100.0, next.i, next.j);
       if (degen_todo.size() == 0 && degen_done.size() == 0 && lowest < 0) {
         AddDegen(lowest_n);
       }
       AddDegen(next);
     }
     if (next.energy_change < lowest) {
-      if (debug) fprintf(stderr, "FndLower %s %6.2f\n", GetPT(next).c_str(), (next.energy_change+energy)/100.0);
+      if (debug) fprintf(stderr, "FndLower %s %6.2f (%3d, %3d)\n", GetPT(next).c_str(), (next.energy_change+energy)/100.0, next.i, next.j);
       ClearDegen();
       lowest = next.energy_change;
       lowest_n = next;
@@ -467,10 +470,9 @@ int Neighborhood::MoveLowest(bool reeval)
   return lowest;
 }
 
-
 void Neighborhood::StartEnumerating()
 {
-  top_loop = -1;
+  top_loop.clear();
   loopnum = 0;
   neighnum = -1;
   IncreaseCount();
@@ -482,9 +484,10 @@ void Neighborhood::IncreaseCount()
   neighnum++;
   if (neighnum >= (int)loops[loopnum]->neighs.size()) {
     neighnum = -1;
-    top_loop = loopnum;
+    top_loop.push_back(loop);
     loopnum++;
     while (loopnum<(int)loops.size() && loops[loopnum]==NULL) loopnum++;
+    while (loop[top_loop.last()].right < loopnum) top_loop.pop();
   }
 }
 
@@ -534,7 +537,7 @@ bool Neighborhood::AddDegen(Neigh &neigh)
   ApplyNeigh(neigh);
 
   // debug:
-  if (debug) fprintf(stderr, "AddDegen %s %6.2f\n", pt_to_str(pt).c_str(), energy/100.0);
+  if (debug) fprintf(stderr, "AddDegen %s %6.2f (%3d, %3d)\n", pt_to_str(pt).c_str(), energy/100.0, neigh.i, neigh.j);
 
   // assign energy if first:
   if (degen_done.size() == 0 && degen_todo.size() == 0) energy_deg = energy;
