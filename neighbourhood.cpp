@@ -143,7 +143,7 @@ Neighborhood::Neighborhood(char *seq_in, short *s0, short *s1, short *pt, bool e
   for (int i=0; i<(int)loops.size(); i++) loops[i] = NULL;
 
   // generate the external loop
-  Loop *newone = new Loop(0, pt[0]);
+  Loop *newone = new Loop(0, pt[0]+1);
   loops[0] = newone;
   int i = newone->GenNeighs(seq, pt);
   if (i==-1) return;
@@ -335,12 +335,12 @@ int Neighborhood::PrintNeighs()
   return res;
 }
 
-int Neighborhood::PrintEnum()
+int Neighborhood::PrintEnum(bool inserts_first)
 {
   int res = 0;
   Neigh tmp(0,0,0);
-  StartEnumerating();
-  while (NextNeighbor(tmp, true)) {
+  StartEnumerating(inserts_first);
+  while (NextNeighbor(tmp, inserts_first, true)) {
     fprintf(stdout, "  %3d %3d %5d\n", tmp.i, tmp.j, tmp.energy_change);
     res++;
   }
@@ -431,30 +431,33 @@ int Neighborhood::MoveLowest(bool reeval)
 
   // resolve degeneracy
   if (degen_todo.size() > 0) {
-    if (energy == energy_deg) degen_done.push_back(new Neighborhood(*this));
+    if (energy == energy_deg) {
+      degen_done.push_back(new Neighborhood(*this));
+      if (debug) fprintf(stderr, "AddDoneD %s %6.2f\n", pt_to_str(pt).c_str(), (energy)/100.0);
+    }
     Neighborhood *todo = degen_todo[0];
     degen_todo.erase(degen_todo.begin());
     int degen_en = todo->MoveLowest(reeval);
-    if (degen_en < 0) {
-      //SoftCopy(*todo);
-      HardCopy(*todo);
-      delete todo;
-      //ClearDegen();
-      return degen_en+lowest;
-    }
-    delete todo;
+    HardCopy(*todo);
+    delete todo;  // maybe can be better
+    //ClearDegen();
+    return degen_en+lowest;
   }
 
   // now chose the lowest one:
   if (degen_done.size() > 0) {
     // chose the lowest one lexicographically:
-    Neighborhood *res = degen_done[0];
-    for (int i=1; i<(int)degen_done.size(); i++) {
+    Neighborhood *res = this;
+    if (debug) fprintf(stderr, "LwstLexT %s %6.2f\n", pt_to_str(pt).c_str(), (energy)/100.0);
+    for (int i=0; i<(int)degen_done.size(); i++) {
+      if (debug) fprintf(stderr, "LwstLex  %s %6.2f\n", pt_to_str(degen_done[i]->pt).c_str(), (degen_done[i]->energy)/100.0);
       if (*degen_done[i] < *res) res = degen_done[i];
     }
 
+    if (debug) fprintf(stderr, "LwstLexW %s %6.2f\n", pt_to_str(res->pt).c_str(), (res->energy)/100.0);
+
     int diff_en = energy - res->energy;
-    HardCopy(*res);
+    if (this != res) HardCopy(*res);
     ClearDegen();
     return diff_en;
   }
@@ -472,24 +475,45 @@ void Neighborhood::StartEnumerating(bool inserts_first)
   top_loop.clear();
   loopnum = 0;
   neighnum = -1; // if neighnum == -1 we do deletes
-  IncreaseCount();
   deletes = false;
+  IncreaseCount(inserts_first);
+}
+
+inline void Neighborhood::MoveLoop()
+{
+  neighnum = -1;
+  top_loop.push_back(loopnum);
+  loopnum++;
+  while (loopnum<(int)loops.size() && loops[loopnum]==NULL) loopnum++;
+  while (top_loop.size()>0 && loops[top_loop.back()]->right < loopnum) top_loop.pop_back();
 }
 
 void Neighborhood::IncreaseCount(bool inserts_first)
 {
-  // increase the count
-  neighnum++;
-  if (neighnum >= (int)loops[loopnum]->neighs.size()) {
-    neighnum = -1;
-    top_loop.push_back(loopnum);
-    loopnum++;
-    while (loopnum<(int)loops.size() && loops[loopnum]==NULL) loopnum++;
-    while (top_loop.size()>0 && loops[top_loop.back()]->right < loopnum) top_loop.pop_back();
+  if (!deletes) {
+    // increase the count
+    neighnum++;
+    if (neighnum >= (int)loops[loopnum]->neighs.size()) {
+      MoveLoop();
+
+    }
+  } else {
+    MoveLoop();
+  }
+
+  // now if the inserts are first:
+  if (inserts_first) {
+    if ((int)loops.size() <= loopnum && !deletes) {
+      // switch to deletes:
+      deletes = true;
+      loopnum = 0;
+      MoveLoop();
+    }
+    if (!deletes && neighnum==-1) IncreaseCount(inserts_first);
   }
 }
 
-bool Neighborhood::NextNeighbor(Neigh &res, bool with_energy)
+bool Neighborhood::NextNeighbor(Neigh &res, bool inserts_first, bool with_energy)
 {
   // first get end:
   if ((int)loops.size() <= loopnum) return false;
@@ -504,7 +528,7 @@ bool Neighborhood::NextNeighbor(Neigh &res, bool with_energy)
   }
 
   // increae the enumeration count
-  IncreaseCount();
+  IncreaseCount(inserts_first);
 
   //if (loop.size() <= loopnum) return false;
   return true;
@@ -564,6 +588,8 @@ bool Neighborhood::AddDegen(Neigh &neigh)
   // add if not found
   if (!res)  {
     degen_todo.push_back(new Neighborhood(*this));
+    // debug:
+    if (debug) fprintf(stderr, "AddTodoD %s %6.2f (%3d, %3d)\n", pt_to_str(pt).c_str(), energy/100.0, neigh.i, neigh.j);
   }
 
   // return state
@@ -580,9 +606,11 @@ extern "C" {
 void test()
 {
 //char num[] = "123456789012345678901234567890123456";
-  char seq[] = "CCCCCCCCCCCCCCCCCCGGGGGGGGGGGGGGGGGG";
-  char str[] = "....(((.......(........)......)))...";
-  short *pt = make_pair_table(str);
+  char seq[] = "UAGAGGUUCGGUGUUGAACGUGUAAAGAAGUAAUGAUUCGUCUUGUUACCAGCAUGGUAUUCCCGCUUCCUGAUGUAUCUGGGAAUAAAGCAAAUAGUAC";
+  char str0[] = "((.(.(((((....))))).).))..................((((...........(((((((((........))....)))))))..)))).......";
+  char str1[] = "((.(.(((((....))))).).))..................(((((..........(((((((((........))....))))))).))))).......";
+  short *pt0 = make_pair_table(str0);
+  short *pt1 = make_pair_table(str1);
 
   make_pair_matrix(); // dunno if needed
   update_fold_params();
@@ -590,19 +618,24 @@ void test()
   short *s0 = encode_sequence(seq, 0);
   short *s1 = encode_sequence(seq, 1);
 
-  Neighborhood nh(seq, s0, s1, pt);
+  Neighborhood nh0(seq, s0, s1, pt0);
+  Neighborhood nh1(seq, s0, s1, pt1);
+
+  fprintf(stderr, "%d\n", nh0 < nh1);
   //nh.EvalNeighs(true);
-  nh.PrintEnum();
+  nh0.PrintEnum(false);
+  nh0.PrintEnum();
 
   //int size = nh.AddBase(15,25,true);
   //fprintf(stderr, "adding %d %d added %d neighbours\n", 15,25,size);
   //nh.PrintNeighs();
   //nh.PrintEnum();
-  nh.PrintStr();
-  while(nh.MoveLowest());
-  nh.PrintStr();
+  //nh.PrintStr();
+  //while(nh.MoveLowest());
+  //nh.PrintStr();
 
-  free(pt);
+  free(pt0);
+  free(pt1);
   free(s0);
   free(s1);
   free_arrays();

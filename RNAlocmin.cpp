@@ -135,8 +135,16 @@ int move_set(struct_en &input, SeqInfo &sqi)
           Neighborhood neigh(sqi.seq, sqi.s0, sqi.s1, input.structure);
           //neigh.PrintEnum();
           while (neigh.MoveLowest(true));
+
+          // testing:
+          //hash_eq heq;
+          //input.energy = move_gradient(sqi.seq, input.structure, sqi.s0, sqi.s1, verbose, Opt.shift, Opt.noLP);
+          //if (neigh.energy != input.energy || !heq(input.structure, neigh.pt)) fprintf(stderr, "UNEQUAL!\n");
+
           copy_arr(input.structure, neigh.pt);
           input.energy = neigh.energy;
+
+
         } else {
           input.energy = move_gradient(sqi.seq, input.structure, sqi.s0, sqi.s1, verbose, Opt.shift, Opt.noLP);
         }

@@ -50,6 +50,15 @@ struct hash_eq {
     else return false;
   }
 
+  bool operator()(const short *lhs, const short *rhs) const {
+    int i=1;
+    while (i<=lhs[0] && lhs[i]==rhs[i]) {
+      i++;
+    }
+    if (i>lhs[0]) return true;
+    else return false;
+  }
+
   bool operator()(const struct_en *lhs, const struct_en *rhs) const{
     int i=1;
     while (i<=lhs->structure[0] && lhs->structure[i]==rhs->structure[i]) {

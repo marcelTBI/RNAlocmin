@@ -46,6 +46,7 @@ private:
   int loopnum;
   int neighnum;
   std::vector<int> top_loop;
+  bool deletes;
 
   // for degeneracy:
   static int energy_deg;
@@ -83,7 +84,7 @@ public:
 
   // printing:
   int PrintNeighs(); // return count neighbors
-  int PrintEnum(); // return count neighbors
+  int PrintEnum(bool inserts_first = true); // return count neighbors
   void PrintStr();
 
   // eval:
@@ -93,9 +94,10 @@ public:
   int MoveLowest(bool reeval = true);  // move to lowest possible bpair (gradient walk), return CHANGE in energy
 
   // enumerating neighbors:
-  void StartEnumerating();
-  void IncreaseCount();
-  bool NextNeighbor(Neigh &res, bool with_energy);  // return True if success, False if end of enumerating
+  void StartEnumerating(bool inserts_first = true);
+  void IncreaseCount(bool inserts_first = true);
+  inline void MoveLoop();
+  bool NextNeighbor(Neigh &res, bool inserts_first = true, bool with_energy = true);  // return True if success, False if end of enumerating
 
   // degeneracy:
   bool AddDegen(Neigh &neigh);  // return True if added, False if already found.
