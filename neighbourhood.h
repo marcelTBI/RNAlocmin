@@ -45,7 +45,7 @@ private:
   // for enumeration:
   int loopnum;
   int neighnum;
-  int top_loop;
+  std::vector<int> top_loop;
 
   // for degeneracy:
   static int energy_deg;

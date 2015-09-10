@@ -19,7 +19,7 @@ extern "C" {
 char *Neighborhood::seq = NULL;
 short *Neighborhood::s0 = NULL;
 short *Neighborhood::s1 = NULL;
-bool Neighborhood::debug = true;
+bool Neighborhood::debug = false;
 
 // for degeneracy:
 int Neighborhood::energy_deg = 0;
@@ -180,6 +180,7 @@ Neighborhood::~Neighborhood()
 void Neighborhood::Free()
 {
   if (debug && pt) fprintf(stderr, "Free     %s %6.2f\n", pt_to_str(pt).c_str(), energy/100.0);
+  top_loop.clear();
 
   if (pt) free(pt);
   for (int i=0; i<(int)loops.size(); i++) {
@@ -430,7 +431,7 @@ int Neighborhood::MoveLowest(bool reeval)
 
   // resolve degeneracy
   if (degen_todo.size() > 0) {
-    if (energy == energy_deg) degen_done.push_back(new Neighborhood(*this)); // copy constructor - OK  ///TODO only if energies match
+    if (energy == energy_deg) degen_done.push_back(new Neighborhood(*this));
     Neighborhood *todo = degen_todo[0];
     degen_todo.erase(degen_todo.begin());
     int degen_en = todo->MoveLowest(reeval);
@@ -441,11 +442,7 @@ int Neighborhood::MoveLowest(bool reeval)
       //ClearDegen();
       return degen_en+lowest;
     }
-      /*if (degen_en < lowest) {
-        *this = degen_todo[i]; // not copy constructor
-        ClearDegen();
-        return degen_en;
-      }*/
+    delete todo;
   }
 
   // now chose the lowest one:
@@ -470,24 +467,25 @@ int Neighborhood::MoveLowest(bool reeval)
   return lowest;
 }
 
-void Neighborhood::StartEnumerating()
+void Neighborhood::StartEnumerating(bool inserts_first)
 {
   top_loop.clear();
   loopnum = 0;
-  neighnum = -1;
+  neighnum = -1; // if neighnum == -1 we do deletes
   IncreaseCount();
+  deletes = false;
 }
 
-void Neighborhood::IncreaseCount()
+void Neighborhood::IncreaseCount(bool inserts_first)
 {
   // increase the count
   neighnum++;
   if (neighnum >= (int)loops[loopnum]->neighs.size()) {
     neighnum = -1;
-    top_loop.push_back(loop);
+    top_loop.push_back(loopnum);
     loopnum++;
     while (loopnum<(int)loops.size() && loops[loopnum]==NULL) loopnum++;
-    while (loop[top_loop.last()].right < loopnum) top_loop.pop();
+    while (top_loop.size()>0 && loops[top_loop.back()]->right < loopnum) top_loop.pop_back();
   }
 }
 
@@ -499,7 +497,7 @@ bool Neighborhood::NextNeighbor(Neigh &res, bool with_energy)
   // deletes and inserts:
   if (neighnum == -1) {
     // deletes
-    res = Neigh(-loops[loopnum]->left, -loops[loopnum]->right, with_energy?RemEnergy(pt, loopnum, top_loop):INT_MAX);
+    res = Neigh(-loops[loopnum]->left, -loops[loopnum]->right, with_energy?RemEnergy(pt, loopnum, top_loop.back()):INT_MAX);
   } else {
     // inserts
     res = loops[loopnum]->neighs[neighnum];
