@@ -127,27 +127,24 @@ int move_set(struct_en &input, SeqInfo &sqi)
     input.energy = move_standard_pk_pt(sqi.seq, &str, sqi.s0, sqi.s1, mt, Opt.shift, Opt.verbose_lvl);
     copy_arr(input.structure, str.str);
   } else {
-    if (Opt.rand) input.energy = move_adaptive(sqi.seq, input.structure, sqi.s0, sqi.s1, verbose);
-    else {
-      if (Opt.first) input.energy = move_first(sqi.seq, input.structure, sqi.s0, sqi.s1, verbose, Opt.shift, Opt.noLP);
+    if (Opt.neighs) {
+      Neighborhood neigh(sqi.seq, sqi.s0, sqi.s1, input.structure);
+      if (Opt.rand) while (neigh.MoveRandom());
+      else while (neigh.MoveLowest(Opt.first));
+
+      // testing:
+      //hash_eq heq;
+      //input.energy = move_gradient(sqi.seq, input.structure, sqi.s0, sqi.s1, verbose, Opt.shift, Opt.noLP);
+      //if (neigh.energy != input.energy || !heq(input.structure, neigh.pt)) fprintf(stderr, "UNEQUAL!\n");
+
+      copy_arr(input.structure, neigh.pt);
+      input.energy = neigh.energy;
+    } else {
+
+      if (Opt.rand) input.energy = move_adaptive(sqi.seq, input.structure, sqi.s0, sqi.s1, verbose);
       else {
-        if (Opt.neighs) {
-          Neighborhood neigh(sqi.seq, sqi.s0, sqi.s1, input.structure);
-          //neigh.PrintEnum();
-          while (neigh.MoveLowest(true));
-
-          // testing:
-          //hash_eq heq;
-          //input.energy = move_gradient(sqi.seq, input.structure, sqi.s0, sqi.s1, verbose, Opt.shift, Opt.noLP);
-          //if (neigh.energy != input.energy || !heq(input.structure, neigh.pt)) fprintf(stderr, "UNEQUAL!\n");
-
-          copy_arr(input.structure, neigh.pt);
-          input.energy = neigh.energy;
-
-
-        } else {
-          input.energy = move_gradient(sqi.seq, input.structure, sqi.s0, sqi.s1, verbose, Opt.shift, Opt.noLP);
-        }
+        if (Opt.first) input.energy = move_first(sqi.seq, input.structure, sqi.s0, sqi.s1, verbose, Opt.shift, Opt.noLP);
+        else input.energy = move_gradient(sqi.seq, input.structure, sqi.s0, sqi.s1, verbose, Opt.shift, Opt.noLP);
       }
     }
   }

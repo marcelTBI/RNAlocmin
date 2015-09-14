@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
+#include <time.h>
 
 #include "neighbourhood.h"
 #include "RNAlocmin.h"
@@ -340,8 +341,8 @@ int Neighborhood::PrintEnum(bool inserts_first)
   int res = 0;
   Neigh tmp(0,0,0);
   StartEnumerating(inserts_first);
-  while (NextNeighbor(tmp, inserts_first, true)) {
-    fprintf(stdout, "  %3d %3d %5d\n", tmp.i, tmp.j, tmp.energy_change);
+  while (NextNeighbor(tmp, inserts_first)) {
+    fprintf(stderr, "  %3d %3d %5d\n", tmp.i, tmp.j, tmp.energy_change);
     res++;
   }
   return res;
@@ -402,7 +403,7 @@ std::string Neighborhood::GetPT(Neigh &next)
   return ret;
 }
 
-int Neighborhood::MoveLowest(bool reeval)
+int Neighborhood::MoveLowest(bool first, bool reeval)
 {
   int lowest = 0;
 
@@ -413,7 +414,7 @@ int Neighborhood::MoveLowest(bool reeval)
   StartEnumerating();
   Neigh next;
   Neigh lowest_n;
-  while (NextNeighbor(next, true)) {
+  while (NextNeighbor(next)) {
     if (next.energy_change == lowest) {
       if (debug) fprintf(stderr, "FndEqual %s %6.2f (%3d, %3d)\n", GetPT(next).c_str(), (next.energy_change+energy)/100.0, next.i, next.j);
       if (degen_todo.size() == 0 && degen_done.size() == 0 && lowest < 0) {
@@ -426,10 +427,25 @@ int Neighborhood::MoveLowest(bool reeval)
       ClearDegen();
       lowest = next.energy_change;
       lowest_n = next;
+      if (first) break;
     }
   }
 
-  // resolve degeneracy
+  // solve degen:
+  if (degen_done.size() + degen_todo.size() > 0) return SolveDegen(false, reeval, lowest, first);
+
+
+  // apply it: (in case of no degeneracy)
+  if (lowest < 0) {
+    ApplyNeigh(lowest_n);
+  }
+
+  return lowest;
+}
+
+int Neighborhood::SolveDegen(bool random, bool reeval, int lowest, bool first)
+{
+    // resolve degeneracy
   if (degen_todo.size() > 0) {
     if (energy == energy_deg) {
       degen_done.push_back(new Neighborhood(*this));
@@ -437,7 +453,7 @@ int Neighborhood::MoveLowest(bool reeval)
     }
     Neighborhood *todo = degen_todo[0];
     degen_todo.erase(degen_todo.begin());
-    int degen_en = todo->MoveLowest(reeval);
+    int degen_en = random?todo->MoveRandom(reeval):todo->MoveLowest(first, reeval);
     HardCopy(*todo);
     delete todo;  // maybe can be better
     //ClearDegen();
@@ -461,13 +477,53 @@ int Neighborhood::MoveLowest(bool reeval)
     ClearDegen();
     return diff_en;
   }
+}
 
-  // apply it: (in case of no degeneracy)
-  if (lowest < 0) {
-    ApplyNeigh(lowest_n);
+int Neighborhood::MoveRandom(bool reeval)
+{
+  srand(time(NULL));
+
+  // debug:
+  if (debug) fprintf(stderr, "MoveRND  %s %6.2f\n", pt_to_str(pt).c_str(), energy/100.0);
+  if (debug) PrintEnum();
+
+  int lowers = 0;
+  int equals = 0;
+  StartEnumerating();
+  Neigh next;
+  while (NextNeighbor(next)) {
+    if (next.energy_change < 0) lowers++;
+    if (next.energy_change == 0) equals++;
   }
 
-  return lowest;
+  // if found any lowers, then draw random and go there
+  if (lowers>0) {
+    int rnd = rand() % lowers;
+    StartEnumerating();
+    while (NextNeighbor(next)) {
+      if (next.energy_change < 0) {
+        if (rnd > 0) rnd--;
+        else break;
+      }
+    }
+
+    ApplyNeigh(next, reeval);
+    return next.energy_change;
+  }
+
+  // else just add all equals to degen and do degen stuff:
+  if (equals == 0) return 0;
+  else {
+    StartEnumerating();
+    while (NextNeighbor(next)) {
+      if (next.energy_change == 0) AddDegen(next);
+    }
+  }
+
+  // solve degen:
+  if (degen_done.size() + degen_todo.size() > 0) return SolveDegen(true, reeval);
+
+  return 0;
 }
 
 void Neighborhood::StartEnumerating(bool inserts_first)

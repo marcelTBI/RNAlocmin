@@ -91,7 +91,8 @@ public:
   int EvalNeighs(bool full); // evaluate the neighbourhood energies and store it efficiently, return energy of us
 
   // gradient descent:
-  int MoveLowest(bool reeval = true);  // move to lowest possible bpair (gradient walk), return CHANGE in energy
+  int MoveLowest(bool first = false, bool reeval = true);  // move to lowest possible bpair (gradient walk or adaptive first found walk if first = true), return CHANGE in energy
+  int MoveRandom(bool reeval = true);   // move to random lowest bpair return CHANGE in energy
 
   // enumerating neighbors:
   void StartEnumerating(bool inserts_first = true);
@@ -102,6 +103,7 @@ public:
   // degeneracy:
   bool AddDegen(Neigh &neigh);  // return True if added, False if already found.
   static void ClearDegen();
+  int SolveDegen(bool random, bool reeval, int lowest = 0, bool first = false);
 
   static void ClearStatic();
 
