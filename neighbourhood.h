@@ -56,7 +56,7 @@ private:
 public:
   short *pt;
   int energy; // = INTMAX until not evaluated;
-  static bool debug;
+  static int debug;
 
 public:
   Neighborhood(char *seq, short *s0, short *s1, short *pt, bool eval = true);

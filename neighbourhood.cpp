@@ -20,7 +20,7 @@ extern "C" {
 char *Neighborhood::seq = NULL;
 short *Neighborhood::s0 = NULL;
 short *Neighborhood::s1 = NULL;
-bool Neighborhood::debug = false;
+int Neighborhood::debug = 0;
 
 // for degeneracy:
 int Neighborhood::energy_deg = 0;
@@ -409,7 +409,7 @@ int Neighborhood::MoveLowest(bool first, bool reeval)
 
   // debug:
   if (debug) fprintf(stderr, "MoveLows %s %6.2f\n", pt_to_str(pt).c_str(), energy/100.0);
-  if (debug) PrintEnum();
+  if (debug>1) PrintEnum();
 
   StartEnumerating();
   Neigh next;
@@ -485,7 +485,7 @@ int Neighborhood::MoveRandom(bool reeval)
 
   // debug:
   if (debug) fprintf(stderr, "MoveRND  %s %6.2f\n", pt_to_str(pt).c_str(), energy/100.0);
-  if (debug) PrintEnum();
+  if (debug>1) PrintEnum();
 
   int lowers = 0;
   int equals = 0;
@@ -498,6 +498,7 @@ int Neighborhood::MoveRandom(bool reeval)
 
   // if found any lowers, then draw random and go there
   if (lowers>0) {
+    ClearDegen();
     int rnd = rand() % lowers;
     StartEnumerating();
     while (NextNeighbor(next)) {
@@ -621,7 +622,7 @@ bool Neighborhood::AddDegen(Neigh &neigh)
   if (degen_done.size() == 0 && degen_todo.size() == 0) energy_deg = energy;
 
   // check:
-  if (0 && energy_deg != energy) {
+  if (energy_deg != energy) {
     fprintf(stderr, "WARNING: energies do not match in AddDegen (%d != %d)\n", energy_deg, energy);
   }
 

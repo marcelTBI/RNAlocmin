@@ -129,6 +129,7 @@ int move_set(struct_en &input, SeqInfo &sqi)
   } else {
     if (Opt.neighs) {
       Neighborhood neigh(sqi.seq, sqi.s0, sqi.s1, input.structure);
+      Neighborhood::debug = verbose;
       if (Opt.rand) while (neigh.MoveRandom());
       else while (neigh.MoveLowest(Opt.first));
 
