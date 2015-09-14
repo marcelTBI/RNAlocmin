@@ -23,7 +23,7 @@ static paramT *P = NULL;
 
 void freeP()
 {
-  free(P);
+  if (P) free(P);
   P = NULL;
 }
 

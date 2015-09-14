@@ -147,24 +147,25 @@ Neighborhood::Neighborhood(char *seq_in, short *s0, short *s1, short *pt, bool e
   Loop *newone = new Loop(0, pt[0]+1);
   loops[0] = newone;
   int i = newone->GenNeighs(seq, pt);
-  if (i==-1) return;
 
   // generate the neighbourhood (inserts)
-  for (; i<pt[0]; i++) {
-    if (pt[i] != 0 && pt[i]>i) {
-      Loop *newone = new Loop(i, pt[i]);
-      loops[i] = newone;
-      int k = newone->GenNeighs(seq, pt);
+  if (i != -1) {
+    for (; i<pt[0]; i++) {
+      if (pt[i] != 0 && pt[i]>i) {
+        Loop *newone = new Loop(i, pt[i]);
+        loops[i] = newone;
+        int k = newone->GenNeighs(seq, pt);
 
-      // jump to next -- either inside or outside
-      if (k!=-1) i = k-1;
-      else i = pt[i];
+        // jump to next -- either inside or outside
+        if (k!=-1) i = k-1;
+        else i = pt[i];
+      }
     }
   }
 
   if (eval) EvalNeighs(true);
   StartEnumerating();
-  debug_loops(loops);
+  //debug_loops(loops);
 }
 
 Neighborhood::Neighborhood(const Neighborhood &second)
@@ -415,14 +416,15 @@ int Neighborhood::MoveLowest(bool first, bool reeval)
   Neigh next;
   Neigh lowest_n;
   while (NextNeighbor(next)) {
-    if (next.energy_change == lowest) {
+    // degeneracy!
+    if (lowest == 0 && next.energy_change == 0) {
       if (debug) fprintf(stderr, "FndEqual %s %6.2f (%3d, %3d)\n", GetPT(next).c_str(), (next.energy_change+energy)/100.0, next.i, next.j);
-      if (degen_todo.size() == 0 && degen_done.size() == 0 && lowest < 0) {
-        AddDegen(lowest_n);
-      }
       AddDegen(next);
     }
-    if (next.energy_change < lowest) {
+
+    // two options: either we have ound the lower one, or we have found the same energetically, but lower lexikografically
+    if (next.energy_change < lowest ||
+        (next.energy_change == lowest && lowest > 0 && next.i < lowest_n.i)) {
       if (debug) fprintf(stderr, "FndLower %s %6.2f (%3d, %3d)\n", GetPT(next).c_str(), (next.energy_change+energy)/100.0, next.i, next.j);
       ClearDegen();
       lowest = next.energy_change;
@@ -445,7 +447,7 @@ int Neighborhood::MoveLowest(bool first, bool reeval)
 
 int Neighborhood::SolveDegen(bool random, bool reeval, int lowest, bool first)
 {
-    // resolve degeneracy
+  // resolve degeneracy
   if (degen_todo.size() > 0) {
     if (energy == energy_deg) {
       degen_done.push_back(new Neighborhood(*this));
@@ -477,6 +479,9 @@ int Neighborhood::SolveDegen(bool random, bool reeval, int lowest, bool first)
     ClearDegen();
     return diff_en;
   }
+
+  fprintf(stderr, "###### WARNING! we should not be here at all! (SolveDegen)");
+  return 0; // will never happen hopefully
 }
 
 int Neighborhood::MoveRandom(bool reeval)
