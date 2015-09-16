@@ -3,6 +3,11 @@
 #include <vector>
 #include <string>
 
+// ###############
+// Neighborhood routines -- note that if you need to have more INDEPENDENT instances of Neighborhood with different degeneracies, you would have to do a bit of coding... since they are static now and need to be static.
+// ###############
+
+
 struct Neigh
 {
   int i;
@@ -52,6 +57,7 @@ private:
   static int energy_deg;
   static std::vector<Neighborhood*> degen_todo;
   static std::vector<Neighborhood*> degen_done;
+  static bool deal_degen;
 
 public:
   short *pt;
@@ -64,7 +70,6 @@ public:
   ~Neighborhood();
 
   void Free();
-  void SoftCopy(const Neighborhood &second, bool free_it = true);
   void HardCopy(const Neighborhood &second);
 
   bool const operator==(const Neighborhood &second) const {
@@ -91,7 +96,7 @@ public:
   int EvalNeighs(bool full); // evaluate the neighbourhood energies and store it efficiently, return energy of us
 
   // gradient descent:
-  int MoveLowest(bool first = false, bool reeval = true);  // move to lowest possible bpair (gradient walk or adaptive first found walk if first = true), return CHANGE in energy
+  int MoveLowest(bool first = false, bool reeval = true);  // move to lowest possible bpair (gradient walk or adaptive first found walk if first = true), return 0 if in LM
   int MoveRandom(bool reeval = true);   // move to random lowest bpair return CHANGE in energy
 
   // enumerating neighbors:
@@ -105,6 +110,7 @@ public:
   static void ClearDegen();
   int SolveDegen(bool random, bool reeval, int lowest = 0, bool first = false);
 
+  static void SwitchOffDegen();
   static void ClearStatic();
 
   // debug

@@ -103,7 +103,7 @@ struct barr_info { // info taken from barriers
 
 // functions that are down in file ;-)
 char *read_seq(char *seq_arg, char **name_out);
-int move(unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs, map<struct_en, int, comps_entries> &output, set<struct_en, comps_entries> &output_shallow, SeqInfo &sqi);
+int move(unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs, map<struct_en, int, comps_entries> &output, set<struct_en, comps_entries> &output_shallow, SeqInfo &sqi, bool pure_output);
 char *read_previous(char *previous, map<struct_en, int, comps_entries> &output);
 char *read_barr(char *previous, map<struct_en, barr_info, comps_entries> &output);
 
@@ -144,6 +144,13 @@ int main(int argc, char **argv)
     model_detailsT  md;
     set_model_details(&md);
     md.dangles = dangles;
+  }
+
+  // degeneracy setup
+  if (args_info.degeneracy_off_flag) {
+    extern int deal_deg;
+    deal_deg = 0;
+    Neighborhood::SwitchOffDegen();
   }
 
   //try_pk();
@@ -195,10 +202,14 @@ int main(int argc, char **argv)
   int not_canonical = 0;
 
   if (!args_info.fix_barriers_given) {
+
+    // if direct output:
+    if (args_info.just_output_flag) printf("     %s\n", seq);
+
     // hash
     unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> structs (HASHSIZE); // structures to minima map
     while ((!args_info.find_num_given || count != args_info.find_num_arg) && !args_info.just_read_flag) {
-      int res = move(structs, output, output_shallow, sqi);
+      int res = move(structs, output, output_shallow, sqi, args_info.just_output_flag);
 
       // print out
       //if (Opt.verbose_lvl>0 && num_moves%10000==0) fprintf(stderr, "processed %d, minima %d, time %f secs.\n", num_moves, count, (clock()-clck1)/(double)CLOCKS_PER_SEC);
@@ -208,7 +219,25 @@ int main(int argc, char **argv)
       if (res==0)   continue; // same structure has been processed already
       if (res==-1)  break; // error or end
       if (res==-2)  not_canonical++;
-      if (res==1)   count=output.size();
+      if (res==1)   count++;
+    }
+
+    if (args_info.just_output_flag) {
+      // end it
+
+      // release resources
+      if (seq!=NULL) free(seq);
+      if (name!=NULL) free(name);
+      cmdline_parser_free(&args_info);
+      freeP();
+      free_arrays();
+
+      // time?
+      if (args_info.verbose_lvl_arg>0) {
+        fprintf(stderr, "Printing results + freeing args: %.2f secs.\n", (clock() - clck1)/(double)CLOCKS_PER_SEC);
+        clck1 = clock();
+      }
+      return 0;
     }
 
 
@@ -484,6 +513,7 @@ int main(int argc, char **argv)
         clck1 = clock();
       }
 
+      // ############### actual output
       // printf output with fathers! maybe
       printf("     %s\n", seq);
       for (unsigned int i=0; i<output_str.size(); i++) {
@@ -800,7 +830,7 @@ char *read_seq(char *seq_arg, char **name_out)
 }
 
 
-int move(unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs, map<struct_en, int, comps_entries> &output, set<struct_en, comps_entries> &output_shallow, SeqInfo &sqi)
+int move(unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs, map<struct_en, int, comps_entries> &output, set<struct_en, comps_entries> &output_shallow, SeqInfo &sqi, bool pure_output)
 {
   // read a line
   char *line = my_getline(stdin);
@@ -858,7 +888,7 @@ int move(unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs, map<
     return -0;
   }
 
-  // was it before?
+  // make make_pair
   struct_en str;
   str.structure = Opt.pknots? make_pair_table_PK(p):make_pair_table(p);
 
@@ -871,6 +901,33 @@ int move(unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs, map<
     free(line);
   }
 
+  // if pure, just do descend and print it:
+  if (pure_output) {
+    //is it canonical (noLP)
+    if (Opt.noLP && find_lone_pair(str.structure)!=-1) {
+      if (Opt.verbose_lvl>0) fprintf(stderr, "WARNING: structure \"%s\" has lone pairs, skipping...\n", pt_to_str_pk(str.structure).c_str());
+      free(str.structure);
+      return -2;
+    }
+
+    //debugging
+    if (Opt.verbose_lvl>1) fprintf(stderr, "proc(pure): %d %s\n", num_moves, pt_to_str_pk(str.structure).c_str());
+
+    // descend
+    move_set(str, sqi);
+    // only some types of PK allowed!!!
+    if (Opt.pknots && str.energy == INT_MAX) {
+      free(str.structure);
+      return 0;
+    }
+
+    if (Opt.verbose_lvl>2) fprintf(stderr, "\n  %s %d\n", pt_to_str_pk(str.structure).c_str(), str.energy);
+    printf("%s %6.2f\n", pt_to_str_pk(str.structure).c_str(), str.energy/100.0);
+    free(str.structure);
+    return 1;
+  }
+
+  // check if it was before
   unordered_map<struct_en, gw_struct, hash_fncts, hash_eq>::iterator it_s = structs.find(str);
 
   // if it was - release memory + get another

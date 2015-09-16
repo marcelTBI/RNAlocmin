@@ -16,10 +16,11 @@
 #define MAX_DEGEN 100
 #define MINGAP 3
 
-
 #define bool int
 #define true 1
 #define false 0
+
+int deal_deg = 1; // do we deal with the degeneracy?
 
 /*
 #################################
@@ -69,23 +70,14 @@ typedef struct _Encoded {
 
 /*
 #################################
-# PRIVATE VARIABLES             #
-#################################
-*/
-PRIVATE int cnt_move = 0;
-
-/*
-#################################
 # PRIVATE FUNCTION DECLARATIONS #
 #################################
 */
 PRIVATE int     compare(short *lhs, short *rhs);
 PRIVATE int     find_min(short *arr[MAX_DEGEN], int begin, int end);
 PRIVATE int     equals(const short *first, const short *second);
-PRIVATE int     count_move(void);
 PRIVATE int     lone_base(short *pt, int i, int j);
 PRIVATE int     exists_base(short *pt, int i, int j);
-PRIVATE int     check_insert(struct_en *str, int i, int j);
 PRIVATE void    free_degen(Encoded *Enc);
 PRIVATE inline void do_move(short *pt, int bp_left, int bp_right);
 PRIVATE int     update_deepest(Encoded *Enc, struct_en *str, struct_en *min);
@@ -166,13 +158,6 @@ allocopy(short *src){
   return res;
 }
 
-PRIVATE int
-count_move(void){
-
-  return cnt_move;
-}
-
-
 
 /* frees all things allocated by degeneracy...*/
 PRIVATE void
@@ -225,7 +210,6 @@ update_deepest(Encoded *Enc, struct_en *str, struct_en *min){
   int last_en = str->energy;
   str->energy = tmp_en;
 
-
   /* use f_point if we have it */
   if (Enc->funct) {
     int end = Enc->funct(str, min);
@@ -245,7 +229,7 @@ update_deepest(Encoded *Enc, struct_en *str, struct_en *min){
   if (Enc->verbose_lvl>1) { fprintf(stderr, "  "); print_str(stderr, str->structure); fprintf(stderr, " %5d D\n", tmp_en); }
 
   /* better deepest*/
-  if (tmp_en < min->energy) {
+  if (str->energy < min->energy || (!deal_deg && str->energy == min->energy && compare(str->structure, min->structure))) {
     min->energy = tmp_en;
     copy_arr(min->structure, str->structure);
 
@@ -264,7 +248,7 @@ update_deepest(Encoded *Enc, struct_en *str, struct_en *min){
   }
 
   /* degeneracy*/
-  if ((str->energy == min->energy) && (Enc->current_en == min->energy)) {
+  if (deal_deg &&(str->energy == min->energy) && (Enc->current_en == min->energy)) {
     int found = 0;
     int i;
     for (i=Enc->begin_pr; i<Enc->end_pr; i++) {
@@ -560,9 +544,6 @@ shifts(Encoded *Enc, struct_en *str, struct_en *minim){
 PRIVATE int
 move_set(Encoded *Enc, struct_en *str){
 
-  /* count how many times called*/
-  cnt_move++;
-
   /* count better neighbours*/
   int cnt = 0;
 
@@ -592,7 +573,7 @@ move_set(Encoded *Enc, struct_en *str){
   }
 
   /* if degeneracy occurs, solve it!*/
-  if (!end && (Enc->end_unpr - Enc->begin_unpr)>0) {
+  if (deal_deg && !end && (Enc->end_unpr - Enc->begin_unpr)>0) {
     Enc->processed[Enc->end_pr] = str->structure;
     Enc->end_pr++;
     str->structure = Enc->unprocessed[Enc->begin_unpr];
@@ -608,7 +589,7 @@ move_set(Encoded *Enc, struct_en *str){
   free(min.structure);
 
   /* resolve degeneracy in local minima*/
-  if ((Enc->end_pr - Enc->begin_pr)>0) {
+  if (deal_deg && (Enc->end_pr - Enc->begin_pr)>0) {
     Enc->processed[Enc->end_pr]=str->structure;
     Enc->end_pr++;
 
@@ -675,9 +656,6 @@ construct_moves(Encoded *Enc, short *structure){
 PRIVATE int
 move_rset(Encoded *Enc, struct_en *str){
 
-  /* count how many times called*/
-  cnt_move++;
-
   /* count better neighbours*/
   int cnt = 0;
 
@@ -702,7 +680,7 @@ move_rset(Encoded *Enc, struct_en *str){
   }
 
   /* if degeneracy occurs, solve it!*/
-  if (!cnt && (Enc->end_unpr - Enc->begin_unpr)>0) {
+  if (deal_deg && !cnt && (Enc->end_unpr - Enc->begin_unpr)>0) {
     Enc->processed[Enc->end_pr] = str->structure;
     Enc->end_pr++;
     str->structure = Enc->unprocessed[Enc->begin_unpr];
@@ -718,7 +696,7 @@ move_rset(Encoded *Enc, struct_en *str){
   free(min.structure);
 
   /* resolve degeneracy in local minima*/
-  if ((Enc->end_pr - Enc->begin_pr)>0) {
+  if (deal_deg && (Enc->end_pr - Enc->begin_pr)>0) {
     Enc->processed[Enc->end_pr]=str->structure;
     Enc->end_pr++;
 
@@ -795,8 +773,6 @@ move_gradient(char *string,
               int shifts,
               int noLP){
 
-  cnt_move = 0;
-
   Encoded enc;
   enc.seq = string;
   enc.s0 = s;
@@ -851,8 +827,6 @@ move_first( char *string,
             int shifts,
             int noLP){
 
-  cnt_move = 0;
-
   Encoded enc;
   enc.seq = string;
   enc.s0 = s;
@@ -906,8 +880,6 @@ move_adaptive(char *string,
               int verbosity_level){
 
   srand(time(NULL));
-
-  cnt_move = 0;
 
   Encoded enc;
   enc.seq = string;
@@ -992,8 +964,6 @@ browse_neighs_pt( char *string,
                   int shifts,
                   int noLP,
                   int (*funct) (struct_en*, struct_en*)){
-
-  cnt_move = 0;
 
   Encoded enc;
   enc.seq = string;

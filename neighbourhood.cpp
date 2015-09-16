@@ -24,6 +24,7 @@ int Neighborhood::debug = 0;
 
 // for degeneracy:
 int Neighborhood::energy_deg = 0;
+bool Neighborhood::deal_degen = 1;
 std::vector<Neighborhood*> Neighborhood::degen_todo;
 std::vector<Neighborhood*> Neighborhood::degen_done;
 
@@ -190,24 +191,6 @@ void Neighborhood::Free()
       delete loops[i];
       loops[i] = NULL;
     }
-  }
-}
-
-void Neighborhood::SoftCopy(const Neighborhood &second, bool free_it)
-{
-  if (free_it) Free();
-
-  this->pt = second.pt;
-  this->energy = second.energy;
-  this->loopnum = second.loopnum;
-  this->neighnum = second.neighnum;
-  this->top_loop = second.top_loop;
-
-  if (debug) fprintf(stderr, "SoftCopy %s %6.2f\n", pt_to_str(pt).c_str(), energy/100.0);
-
-  loops.resize(second.loops.size(), NULL);
-  for (int i=0; i<(int)second.loops.size(); i++) {
-    if (second.loops[i]) loops[i] = second.loops[i];
   }
 }
 
@@ -414,35 +397,38 @@ int Neighborhood::MoveLowest(bool first, bool reeval)
 
   StartEnumerating();
   Neigh next;
+  bool lowest_found = false;
   Neigh lowest_n;
   while (NextNeighbor(next)) {
     // degeneracy!
-    if (lowest == 0 && next.energy_change == 0) {
+    if (lowest == 0 && next.energy_change == 0 && deal_degen) {
       if (debug) fprintf(stderr, "FndEqual %s %6.2f (%3d, %3d)\n", GetPT(next).c_str(), (next.energy_change+energy)/100.0, next.i, next.j);
       AddDegen(next);
     }
 
     // two options: either we have ound the lower one, or we have found the same energetically, but lower lexikografically
     if (next.energy_change < lowest ||
-        (next.energy_change == lowest && lowest > 0 && next.i < lowest_n.i)) {
+        (next.energy_change == lowest && (lowest > 0 || !deal_degen) && next.i>0 && (!lowest_found || next.i < lowest_n.i))) {
       if (debug) fprintf(stderr, "FndLower %s %6.2f (%3d, %3d)\n", GetPT(next).c_str(), (next.energy_change+energy)/100.0, next.i, next.j);
       ClearDegen();
       lowest = next.energy_change;
       lowest_n = next;
+      lowest_found = true;
       if (first) break;
     }
   }
 
   // solve degen:
-  if (degen_done.size() + degen_todo.size() > 0) return SolveDegen(false, reeval, lowest, first);
+  if (deal_degen && (degen_done.size() + degen_todo.size() > 0)) return SolveDegen(false, reeval, lowest, first);
 
 
   // apply it: (in case of no degeneracy)
-  if (lowest < 0) {
+  if (lowest_found) {
     ApplyNeigh(lowest_n);
   }
 
-  return lowest;
+  if (lowest_found && lowest == 0) return 1;
+  else return lowest;
 }
 
 int Neighborhood::SolveDegen(bool random, bool reeval, int lowest, bool first)
@@ -520,14 +506,16 @@ int Neighborhood::MoveRandom(bool reeval)
   // else just add all equals to degen and do degen stuff:
   if (equals == 0) return 0;
   else {
-    StartEnumerating();
-    while (NextNeighbor(next)) {
-      if (next.energy_change == 0) AddDegen(next);
+    if (deal_degen) {
+      StartEnumerating();
+      while (NextNeighbor(next)) {
+        if (next.energy_change == 0) AddDegen(next);
+      }
     }
   }
 
   // solve degen:
-  if (degen_done.size() + degen_todo.size() > 0) return SolveDegen(true, reeval);
+  if (deal_degen && (degen_done.size() + degen_todo.size() > 0)) return SolveDegen(true, reeval);
 
   return 0;
 }
@@ -611,6 +599,11 @@ void Neighborhood::ClearDegen()
 
   degen_done.clear();
   degen_todo.clear();
+}
+
+void Neighborhood::SwitchOffDegen()
+{
+  deal_degen = false;
 }
 
 bool Neighborhood::AddDegen(Neigh &neigh)

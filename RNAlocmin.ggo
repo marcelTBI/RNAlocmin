@@ -39,6 +39,8 @@ option "fix-barriers"       - "Fix barrier file for interior loops (just recompu
 option "pseudoknots"        k "Allow for pseudoknots according to \"gfold\" model - H, K, L, and M types (genus one) of pseudoknots are allowed. (slower)" flag off
 option "just-read"          - "Do not assume further input, just do postprocessing." flag off
 option "neighborhood"       N "Use the Neighborhood routines to perform gradient descend. Test option." flag off
+option "degeneracy-off"     - "Do not deal with degeneracy." flag off
+option "just-output"        - "Do not store the input and output, just compute directly minima and output them. Output file is not sorted and there can be duplicates." flag off
 
 section "Misc"
 option "numIntervals"       - "Number of intervals for Jing's visualisation" int default="0" no hidden
