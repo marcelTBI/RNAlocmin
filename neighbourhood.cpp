@@ -42,8 +42,19 @@ Neigh::Neigh(int i, int j, int energy)
   energy_change = energy;
 }
 
-Neigh::Neigh():Neigh(-1,-1)
+Neigh::Neigh():Neigh(0, 0)
 {
+}
+
+bool const Neigh::operator<(const Neigh &second) const
+{
+  // typ = insert, nothing, delete
+  int typ_us = i>0?0:(i==0?1:2);
+  int typ_them = second.i>0?0:(second.i==0?1:2);
+
+  // if types of neighbor are same, then just compare the numbers in them
+  if (typ_us == typ_them) return i<second.i;
+  else return typ_us < typ_them;
 }
 
 Loop::Loop(int i, int j)
@@ -408,7 +419,7 @@ int Neighborhood::MoveLowest(bool first, bool reeval)
 
     // two options: either we have ound the lower one, or we have found the same energetically, but lower lexikografically
     if (next.energy_change < lowest ||
-        (next.energy_change == lowest && (lowest > 0 || !deal_degen) && next.i>0 && (!lowest_found || next.i < lowest_n.i))) {
+        (next.energy_change == lowest && (lowest > 0 || !deal_degen) && next < lowest_n)) {
       if (debug) fprintf(stderr, "FndLower %s %6.2f (%3d, %3d)\n", GetPT(next).c_str(), (next.energy_change+energy)/100.0, next.i, next.j);
       ClearDegen();
       lowest = next.energy_change;

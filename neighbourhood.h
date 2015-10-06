@@ -17,6 +17,7 @@ struct Neigh
 
   Neigh(int i, int j, int energy = INT_MAX);
   Neigh();
+  bool const operator<(const Neigh &second) const; // for lexicographic comparison
 };
 
 struct Loop
