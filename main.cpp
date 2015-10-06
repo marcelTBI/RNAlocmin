@@ -914,15 +914,15 @@ int move(unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs, map<
     if (Opt.verbose_lvl>1) fprintf(stderr, "proc(pure): %d %s\n", num_moves, pt_to_str_pk(str.structure).c_str());
 
     // descend
-    move_set(str, sqi);
+    int gw_length = move_set(str, sqi);
     // only some types of PK allowed!!!
     if (Opt.pknots && str.energy == INT_MAX) {
       free(str.structure);
       return 0;
     }
 
-    if (Opt.verbose_lvl>2) fprintf(stderr, "\n  %s %d\n", pt_to_str_pk(str.structure).c_str(), str.energy);
-    printf("%s %6.2f\n", pt_to_str_pk(str.structure).c_str(), str.energy/100.0);
+    if (Opt.verbose_lvl>2) fprintf(stderr, "\n  %s %d %d\n", pt_to_str_pk(str.structure).c_str(), str.energy, gw_length);
+    printf("%s %6.2f %4d\n", pt_to_str_pk(str.structure).c_str(), str.energy/100.0, gw_length);
     free(str.structure);
     return 1;
   }

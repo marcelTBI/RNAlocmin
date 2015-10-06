@@ -116,7 +116,7 @@ string pt_to_str(short *pt)
   return str;
 }
 
-// encapsulation
+// encapsulation -- returns energy of the minimum, in case of -N it returns length of the gradient walk.
 int move_set(struct_en &input, SeqInfo &sqi)
 {
   // call the coresponding method
@@ -130,8 +130,9 @@ int move_set(struct_en &input, SeqInfo &sqi)
     if (Opt.neighs) {
       Neighborhood neigh(sqi.seq, sqi.s0, sqi.s1, input.structure);
       Neighborhood::debug = verbose;
+      int length = 0;
       if (Opt.rand) while (neigh.MoveRandom());
-      else while (neigh.MoveLowest(Opt.first));
+      else while (neigh.MoveLowest(Opt.first)) length++;
 
       // testing:
       //hash_eq heq;
@@ -140,6 +141,7 @@ int move_set(struct_en &input, SeqInfo &sqi)
 
       copy_arr(input.structure, neigh.pt);
       input.energy = neigh.energy;
+      return length;
     } else {
 
       if (Opt.rand) input.energy = move_adaptive(sqi.seq, input.structure, sqi.s0, sqi.s1, verbose);
