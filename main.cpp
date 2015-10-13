@@ -204,7 +204,7 @@ int main(int argc, char **argv)
   if (!args_info.fix_barriers_given) {
 
     // if direct output:
-    if (args_info.just_output_flag) printf("     %s\n", seq);
+    if (args_info.just_output_flag) printf("%s\n", seq);
 
     // hash
     unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> structs (HASHSIZE); // structures to minima map
