@@ -399,7 +399,7 @@ int Neighborhood::MoveLowest(bool first, bool reeval)
   Neigh next;
   bool lowest_found = false;
   Neigh lowest_n;
-  while (NextNeighbor(next)) {
+  while (NextNeighbor(next)) { // linear -- with a better data class, we would be able to pick the lowest energy first and have it in O(1) (or O(log n)) -- the majority of time comes from energy evaluation, so maybe not a reasonto do that...
     // degeneracy!
     if (lowest == 0 && next.energy_change == 0 && deal_degen) {
       if (debug) fprintf(stderr, "FndEqual %s %6.2f (%3d, %3d)\n", GetPT(next).c_str(), (next.energy_change+energy)/100.0, next.i, next.j);
