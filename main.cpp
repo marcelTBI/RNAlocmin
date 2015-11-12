@@ -146,6 +146,10 @@ int main(int argc, char **argv)
     md.dangles = dangles;
   }
 
+  // adjust dependencies:
+  if (args_info.barr_name_given) {args_info.bartree_flag = true;}
+  if (args_info.rates_file_given) {args_info.rates_flag = true;}
+
   // degeneracy setup
   if (args_info.degeneracy_off_flag) {
     extern int deal_deg;
