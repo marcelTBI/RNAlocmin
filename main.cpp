@@ -223,7 +223,7 @@ int main(int argc, char **argv)
       if (res==0)   continue; // same structure has been processed already
       if (res==-1)  break; // error or end
       if (res==-2)  not_canonical++;
-      if (res==1)   count++;
+      if (res==1)   count=output.size();
     }
 
     if (args_info.just_output_flag) {
@@ -345,7 +345,7 @@ int main(int argc, char **argv)
     //}
 
     // time?
-    if (args_info.verbose_lvl_arg>0) {
+    if (Opt.minh>0 && args_info.verbose_lvl_arg>0) {
       fprintf(stderr, "Discarding shallow minima: %.2f secs.\n", (clock() - clck1)/(double)CLOCKS_PER_SEC);
       clck1 = clock();
     }
@@ -387,7 +387,7 @@ int main(int argc, char **argv)
         // flood only if low number of walks ended there
         if (output_num[i]<=threshold && Opt.floodMax>0) {
           //copy_arr(Enc.pt, output_he[i].structure);
-          if (args_info.verbose_lvl_arg>2) fprintf(stderr,   "flooding  (%3d): %s %.2f\n", i, output_str[i].c_str(), output_he[i].energy/100.0);
+          if (args_info.verbose_lvl_arg>2) fprintf(stderr,   "flooding  (%3d): %s %.2f\n", i+1, output_str[i].c_str(), output_he[i].energy/100.0);
 
           int saddle;
           struct_en *he = flood(output_he[i], sqi, saddle, Opt.minh, args_info.pseudoknots_flag);
