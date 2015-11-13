@@ -20,7 +20,7 @@ option "find-num"           - "Maximal number of local minima found\n(default = 
 option "verbose-lvl"        v "Level of verbosity (0 = nothing, 4 = full)\nWARNING: higher verbose levels increase the computation time" int default="0" no
 option "depth"              - "Depth of findpath search (higher value increases running time linearly)" int default="10" no
 option "minh"               - "Print only minima with energy barrier greater than this" double default="0.0" no
-option "minh-lite"          - "When flooding with --minh option, search for only saddle (do not search for a LM that is lower). Increases efficiency a tiny bit, but when turned on, the results may omit some non-shallow minima, especially with higher --minh value" flag off hidden
+option "minh-lite"          - "When flooding with --minh option, search for only saddle (do not search for a LM that is lower). Increases efficiency a tiny bit, but when turned on, the results may omit some non-shallow minima, especially with higher --minh value." flag off hidden
 option "walk"               w "Walking method used\nD ==> gradient descent\nF ==> use first found lower energy structure\nR ==> use random lower energy structure (does not work with --noLP and -m S options)" values="D","F","R" default="D" no
 option "noLP"               - "Work only with canonical RNA structures (w/o isolated base pairs, cannot be combined with ranodm walk (-w R option) and shift move set (-m S))" flag off
 option "useEOS"             e "Use energy_of_structure_pt calculation instead of energy_of_move (slower, it should not affect results)" flag off hidden
@@ -37,14 +37,14 @@ details="\nWith -d1 only unpaired bases can participate in at most one dangling 
  energy model.\n\n" int default="2" optional
 option "fix-barriers"       - "Fix barrier file for interior loops (just recompute if all LM in barrier output are LM), if specified, does not need neither --previous nor --seq option" string no hidden
 option "pseudoknots"        k "Allow for pseudoknots according to \"gfold\" model - H, K, L, and M types (genus one) of pseudoknots are allowed (increases computation time greatly), cannot be combined with shift move set (-m S)" flag off
-option "just-read"          - "Do not assume further input, just do postprocessing" flag off
-option "neighborhood"       N "Use the Neighborhood routines to perform gradient descend. Test option, cannot be combined with shift move set (-m S) and pseudoknots (-k)" flag off
-option "degeneracy-off"     - "Do not deal with degeneracy, select the lexicographically first from the same energy neighbors" flag off
+option "just-read"          - "Do not expect input from stdin, just do postprocessing." flag off
+option "neighborhood"       N "Use the Neighborhood routines to perform gradient descend. Cannot be combined with shift move set (-m S) and pseudoknots (-k). Test option." flag off
+option "degeneracy-off"     - "Do not deal with degeneracy, select the lexicographically first from the same energy neighbors." flag off
 option "just-output"        - "Do not store the minima and optimize, just compute directly minima and output them. Output file can contain duplicates." flag off
 
 section "Barrier tree"
-option "bartree"            b "Generate an approximate barrier tree" flag off
-option "barr-name"          - "Name of barrier tree output file, switches on -b flag" string default="treeRNAloc.ps"
+option "bartree"            b "Generate an approximate barrier tree." flag off
+option "barr-name"          - "Name of barrier tree output file, switches on -b flag." string default="treeRNAloc.ps"
 
 section "Kinetics (rates for treekin program)"
 option "barrier-file"       - "File for saddle heights between LM (simulates the output format of barriers program)" string no
@@ -53,10 +53,10 @@ option "rates-file"         f "File where to write rates, switches on -r flag" s
 option "temp"               T "Temperature in Celsius (only for rates)" double default="37.0" no
 
 section "Flooding parameters (flooding occurs only with -r, -b, or --minh option)"
-option "floodPortion"       - "Fraction of minima to flood (floods first minima with low number of inwalking sample structures)\n(0.0 -> no flood; 1.0 -> try to flood all of them)" double default="0.95" no
+option "floodPortion"       - "Fraction of minima to flood (floods first minima with low number of inwalking sample structures)\n(0.0 -> no flood; 1.0 -> try to flood all) Usable only with -r or -b options." double default="0.95" no
 option "floodMax"           - "Flood cap - how many structures to flood in one basin" int default="1000" no
 
 section "Miscelaneous"
 option "numIntervals"       - "Number of intervals for Jing's visualisation" int default="0" no hidden
-option "eRange"             - "Report only LM, which energy is in range <MFE (or lowest found LM), MFE+eRange>" float no
+option "eRange"             - "Report only LM, which energy is in range <MFE (or lowest found LM), MFE+eRange> in kcal/mol." float no
 option "allegiance"         - "Filename where to output the allegiance of structures. Works properly only with RNAsubopt -e list." string hidden no
