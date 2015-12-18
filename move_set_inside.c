@@ -22,6 +22,12 @@
 
 int deal_deg = 1; // do we deal with the degeneracy?
 
+void degeneracy_handling(int degeneracy)
+{
+	deal_deg = degeneracy;
+}
+
+
 /*
 #################################
 # PRIVATE DATA STRUCTURES       #

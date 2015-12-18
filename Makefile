@@ -19,8 +19,8 @@ OBJ = RNAlocmin_cmdline.o\
 			move_set_pk.o\
 			pknots.o\
 			findpath_pk.o\
-			move_set_inside.o\
-			neighbourhood.o
+			neighbourhood.o\
+			move_set_inside.o
 
 DIRS = -I $(ViennaRNA)
 

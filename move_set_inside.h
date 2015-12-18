@@ -85,6 +85,12 @@ int browse_neighs( char *seq,
                    int noLP,
                    int (*funct) (struct_en*, struct_en*));
 
+/* switches OFF (and ON) degeneracy handling, ON by default
+    input:    degeneracy - 0 for degeneracy handling OFF, 1 for ON
+    returns void */
+
+void degeneracy_handling(int degeneracy);
+
 #endif
 
 

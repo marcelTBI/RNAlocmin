@@ -152,8 +152,7 @@ int main(int argc, char **argv)
 
   // degeneracy setup
   if (args_info.degeneracy_off_flag) {
-    extern int deal_deg;
-    deal_deg = 0;
+    degeneracy_handling(0);
     Neighborhood::SwitchOffDegen();
   }
 
@@ -593,7 +592,7 @@ int main(int argc, char **argv)
 
 char *read_previous(char *previous, map<struct_en, int, comps_entries> &output)
 {
-  char *seq;
+  char *seq = NULL;
   FILE *fprev;
   fprev = fopen(previous, "r");
   if (fprev == NULL) {
@@ -849,7 +848,7 @@ int move(unordered_map<struct_en, gw_struct, hash_fncts, hash_eq> &structs, map<
   // process lines
   char *p = line;
   char *sep = " \t\n";
-  char *temp;
+  char *temp = NULL;
 
   bool struct_found = false;
   bool energy_found = false;
